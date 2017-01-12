@@ -4,6 +4,8 @@
 #include "queue.h"
 #include <assert.h>
 
+//Kelly Martin and Mark Harris
+
 // Uncomment line below to print out informational messages during queue operation.
 // #define QUEUE_PRINT_INFO_MESSAGES
 
