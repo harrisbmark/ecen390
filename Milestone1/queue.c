@@ -4,7 +4,28 @@
 #include "queue.h"
 #include <assert.h>
 
+#define QUEUE_INCREMENT_INDEX 1
+#define QUEUE_POP_UNDERFLOW_ERROR -1
+
 //Kelly Martin and Mark Harris
+
+/**********************************************************************************/
+/* Needed to be done (delete this comment block when completed):                  */
+/*     * Means that the item has been completed.                                  */
+/*                                                                                */
+/*     Kelly Martin:                                                              */
+/*         queue_readElementAt                                                    */
+/*         queue_elementCount                                                     */
+/*         queue_overflow                                                         */
+/*         queue_underflow                                                        */
+/*                                                                                */
+/*     Mark Harris:                                                               */
+/*         *queue_full                                                            */
+/*         *queue_empty                                                           */
+/*         *queue_push                                                            */
+/*         *queue_pop                                                             */
+/*         *queue_overwritePush                                                   */
+/**********************************************************************************/
 
 // Uncomment line below to print out informational messages during queue operation.
 // #define QUEUE_PRINT_INFO_MESSAGES
@@ -12,7 +33,7 @@
 // Standard queue implementation that leaves one spot empty so easier to check for full/empty.
 void queue_init(queue_t* q, queue_size_t size, const char* name) {
   q->underflowFlag = false;  // True if queue_pop() is called on an empty queue.
-  q-> overflowFlag = false;  // True if queue_push() is called on a full queue.
+  q->overflowFlag = false;  // True if queue_push() is called on a full queue.
   q->indexIn = 0;
   q->indexOut = 0;
   q->elementCount = 0;       // Not required but may ease implementation.
@@ -33,6 +54,101 @@ void queue_init(queue_t* q, queue_size_t size, const char* name) {
 
 // Tell the user size in terms of usable locations.
 queue_size_t queue_size(queue_t* q) {return q->size-1;}
+
+/**********************************************************************************/
+/* Function: queue_full                                                           */
+/* Purpose: To inform the user if the queue is full.                              */
+/* Returns: A boolean value.                                                      */
+/**********************************************************************************/
+bool queue_full(queue_t* q)
+{
+    if (((q->indexOut + QUEUE_INCREMENT_INDEX) % q->size) == q->indexIn)
+    {
+        return true;
+    }
+
+    else
+    {
+        return false;
+    }
+}
+
+/**********************************************************************************/
+/* Function: queue_empty                                                          */
+/* Purpose: To inform the user if the queue is empty.                             */
+/* Returns: A boolean value.                                                      */
+/**********************************************************************************/
+bool queue_empty(queue_t* q)
+{
+    if (q->indexIn == q->indexOut)
+    {
+        return true;
+    }
+
+    else
+    {
+        return false;
+    }
+}
+
+/**********************************************************************************/
+/* Function: queue_push                                                           */
+/* Purpose: To push objects onto the queue.                                       */
+/* Returns: VOID                                                                  */
+/**********************************************************************************/
+void queue_push(queue_t* q, queue_data_t value)
+{
+    if (queue_full(q))
+    {
+        q->overflowFlag = true;
+        printf("Error! Trying to push to queue when the queue is full!\n\r");
+    }
+
+    else
+    {
+        q->data[q->indexIn] = value;
+        q->indexIn = (q->indexIn + QUEUE_INCREMENT_INDEX) % q->size;
+    }
+}
+
+/**********************************************************************************/
+/* Function: queue_pop                                                            */
+/* Purpose: To pop objects from the queue.                                        */
+/* Returns: A queue data type.                                                    */
+/**********************************************************************************/
+queue_data_t queue_pop(queue_t* q)
+{
+    if (queue_empty(q))
+    {
+        q->underflowFlag = true;
+        printf("Error! Trying to pop from queue when the queue is empty!\n\r");
+
+        return QUEUE_POP_UNDERFLOW_ERROR;
+    }
+
+    else
+    {
+        queue_data_t temp_value = q->data[q->indexOut];
+        q->indexOut = (q->indexOut - QUEUE_INCREMENT_INDEX) % q->size;
+
+        return temp_value;
+    }
+}
+
+/**********************************************************************************/
+/* Function: queue_overwritePush                                                  */
+/* Purpose: To push objects onto a queue that is already full.                    */
+/* Returns: VOID                                                                  */
+/**********************************************************************************/
+void queue_overwritePush(queue_t* q, queue_data_t value)
+{
+    if (queue_full(q))
+    {
+        queue_pop(q);
+    }
+
+    queue_push(q, value);
+}
 
 // Return the name of the queue.
 const char* queue_name(queue_t* q) {return q->name;}
