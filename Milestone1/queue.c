@@ -7,26 +7,6 @@
 #define QUEUE_INCREMENT_INDEX 1
 #define QUEUE_POP_UNDERFLOW_ERROR -1
 
-//Kelly Martin and Mark Harris
-
-/**********************************************************************************/
-/* Needed to be done (delete this comment block when completed):                  */
-/*     * Means that the item has been completed.                                  */
-/*                                                                                */
-/*     Kelly Martin:                                                              */
-/*         queue_readElementAt                                                    */
-/*         queue_elementCount                                                     */
-/*         queue_overflow                                                         */
-/*         queue_underflow                                                        */
-/*                                                                                */
-/*     Mark Harris:                                                               */
-/*         *queue_full                                                            */
-/*         *queue_empty                                                           */
-/*         *queue_push                                                            */
-/*         *queue_pop                                                             */
-/*         *queue_overwritePush                                                   */
-/**********************************************************************************/
-
 // Uncomment line below to print out informational messages during queue operation.
 // #define QUEUE_PRINT_INFO_MESSAGES
 
@@ -43,7 +23,7 @@ queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
         return -1;
     }
     else{
-        return *q->data[index];
+        return q->data[index];
     }
     /*
 
@@ -68,7 +48,7 @@ queue_size_t queue_elementCount(queue_t* q){
 // Returns true if an underflow has occurred (queue_pop() called on an empty queue).
 bool queue_underflow(queue_t* q){
 
-        if(underflowFlag){
+        if(q->underflowFlag){
             return true;
         }
         else {
@@ -79,7 +59,7 @@ bool queue_underflow(queue_t* q){
 // Returns true if an overflow has occurred (queue_push() called on a full queue).
 bool queue_overflow(queue_t* q){
 
-    if(overflowFlag){
+    if(q->overflowFlag){
         return true;
     }
     else{
@@ -97,11 +77,6 @@ queue_data_t queue_value;
         printf("index %d and value is %d", index, queue_value);
     }
 }
-
-
-
-
-
 
 // Standard queue implementation that leaves one spot empty so easier to check for full/empty.
 void queue_init(queue_t* q, queue_size_t size, const char* name) {
