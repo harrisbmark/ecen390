@@ -20,37 +20,27 @@
 queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
     if(index >= q->size){
         printf("That is not a valid index for the queue\n\r");
-        return -1;
+        return QUEUE_POP_UNDERFLOW_ERROR;
     }
     else{
+        //printf("index out is: %d\n\r", q->indexOut);
+        //printf("value at the index is %lf\n\r", q->data[(index + q->indexOut) % q->size]);
         return (q->data[(index + q->indexOut) % q->size]);
     }
-
-    /*
-
-    psuedocode
-    if(index is greater than the length of the queue){
-        printf("That is not a valid index number\n\r");
-        return -1;
-    }
-    else{
-        return *q.data[index];
-    }
-    */
 
 }
 
 // Returns a count of the elements currently contained in the queue.
 queue_size_t queue_elementCount(queue_t* q){
-
-    return (abs(abs(q->size - q->indexOut) - abs(q->size - q->indexIn)));
+    return q->elementCount;
+    //return (abs(abs(q->size - q->indexOut) - abs(q->size - q->indexIn)));
     //return q->indexOut > q->indexIn ? (q->size - q->indexOut + q->indexIn + 1) : (q->indexIn - q->indexOut + 1);
 }
 
 // Returns true if an underflow has occurred (queue_pop() called on an empty queue).
 bool queue_underflow(queue_t* q){
 
-        if(q->underflowFlag){
+        if(q->underflowFlag == true){
             return true;
         }
         else {
@@ -61,7 +51,7 @@ bool queue_underflow(queue_t* q){
 // Returns true if an overflow has occurred (queue_push() called on a full queue).
 bool queue_overflow(queue_t* q){
 
-    if(q->overflowFlag){
+    if(q->overflowFlag == true){
         return true;
     }
     else{
@@ -72,11 +62,13 @@ bool queue_overflow(queue_t* q){
 // Prints the current contents of the queue. Handy for debugging.
 // This must print out the contents of the queue in the order of oldest element first to newest element last.
 // HINT: Just use queue_readElementAt() in a for-loop. Trivial to implement this way.
-void queue_print(queue_t* q){
 queue_data_t queue_value;
-    for(uint8_t i = INITIAL; i < q->size; i++){
-    queue_value = queue_readElementAt(q, i);
-        printf("index %d and value is %d\n\r", index, queue_value);
+void queue_print(queue_t* q){
+
+    for(uint8_t i = INITIAL; i < q->size; i++){ //THis is print 0 through 10 and it shouldnt print index 10....
+        queue_value = queue_readElementAt(q, i);
+        //printf("queue value is %d\n\r", queue_value);
+        printf("index %d and value is %lf\n\r", i, queue_readElementAt(q, i));
     }
 }
 
@@ -112,6 +104,7 @@ queue_size_t queue_size(queue_t* q) {return q->size-1;}
 /**********************************************************************************/
 bool queue_full(queue_t* q)
 {
+
     if (((q->indexIn + QUEUE_INCREMENT_INDEX) % q->size) == q->indexOut)
     {
         return true;
@@ -121,6 +114,8 @@ bool queue_full(queue_t* q)
     {
         return false;
     }
+
+
 }
 
 /**********************************************************************************/
@@ -130,6 +125,7 @@ bool queue_full(queue_t* q)
 /**********************************************************************************/
 bool queue_empty(queue_t* q)
 {
+
     if (q->indexOut == q->indexIn)
     {
         return true;
@@ -139,6 +135,7 @@ bool queue_empty(queue_t* q)
     {
         return false;
     }
+
 }
 
 /**********************************************************************************/
@@ -156,6 +153,8 @@ void queue_push(queue_t* q, queue_data_t value)
 
     else
     {
+        q->underflowFlag = false;
+        q->elementCount++;
         q->data[q->indexIn] = value;
         q->indexIn = (q->indexIn + QUEUE_INCREMENT_INDEX) % q->size;
     }
@@ -178,6 +177,8 @@ queue_data_t queue_pop(queue_t* q)
 
     else
     {
+        q->overflowFlag = false;
+        q->elementCount--;
         queue_data_t temp_value = q->data[q->indexOut];
         q->indexOut = (q->indexOut + QUEUE_INCREMENT_INDEX) % q->size;
 
