@@ -23,8 +23,9 @@ queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
         return -1;
     }
     else{
-        return q->data[index];
+        return (q->data[(index + q->indexOut) % q->size]);
     }
+
     /*
 
     psuedocode
@@ -42,7 +43,8 @@ queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
 // Returns a count of the elements currently contained in the queue.
 queue_size_t queue_elementCount(queue_t* q){
 
-    return q->size;
+    return (abs(abs(q->size - q->indexOut) - abs(q->size - q->indexIn)));
+    //return q->indexOut > q->indexIn ? (q->size - q->indexOut + q->indexIn + 1) : (q->indexIn - q->indexOut + 1);
 }
 
 // Returns true if an underflow has occurred (queue_pop() called on an empty queue).
@@ -72,9 +74,9 @@ bool queue_overflow(queue_t* q){
 // HINT: Just use queue_readElementAt() in a for-loop. Trivial to implement this way.
 void queue_print(queue_t* q){
 queue_data_t queue_value;
-    for(int i = INITIAL; i < q->size; i++){
+    for(uint8_t i = INITIAL; i < q->size; i++){
     queue_value = queue_readElementAt(q, i);
-        printf("index %d and value is %d", index, queue_value);
+        printf("index %d and value is %d\n\r", index, queue_value);
     }
 }
 
@@ -110,7 +112,7 @@ queue_size_t queue_size(queue_t* q) {return q->size-1;}
 /**********************************************************************************/
 bool queue_full(queue_t* q)
 {
-    if (((q->indexOut + QUEUE_INCREMENT_INDEX) % q->size) == q->indexIn)
+    if (((q->indexIn + QUEUE_INCREMENT_INDEX) % q->size) == q->indexOut)
     {
         return true;
     }
@@ -128,7 +130,7 @@ bool queue_full(queue_t* q)
 /**********************************************************************************/
 bool queue_empty(queue_t* q)
 {
-    if (q->indexIn == q->indexOut)
+    if (q->indexOut == q->indexIn)
     {
         return true;
     }
@@ -177,7 +179,7 @@ queue_data_t queue_pop(queue_t* q)
     else
     {
         queue_data_t temp_value = q->data[q->indexOut];
-        q->indexOut = (q->indexOut - QUEUE_INCREMENT_INDEX) % q->size;
+        q->indexOut = (q->indexOut + QUEUE_INCREMENT_INDEX) % q->size;
 
         return temp_value;
     }
