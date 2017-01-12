@@ -9,6 +9,79 @@
 // Uncomment line below to print out informational messages during queue operation.
 // #define QUEUE_PRINT_INFO_MESSAGES
 
+#define EMPTY_QUEUE 0
+#define INITIAL 0
+
+// Provides random-access read capability to the queue.
+// Low-valued indexes access older queue elements while higher-value indexes access newer elements
+// (according to the order that they were added).
+// Print a meaningful error message if an error condition is detected.
+queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
+    if(index >= q->size){
+        printf("That is not a valid index for the queue\n\r");
+        return -1;
+    }
+    else{
+        return *q->data[index];
+    }
+    /*
+
+    psuedocode
+    if(index is greater than the length of the queue){
+        printf("That is not a valid index number\n\r");
+        return -1;
+    }
+    else{
+        return *q.data[index];
+    }
+    */
+
+}
+
+// Returns a count of the elements currently contained in the queue.
+queue_size_t queue_elementCount(queue_t* q){
+
+    return q->size;
+}
+
+// Returns true if an underflow has occurred (queue_pop() called on an empty queue).
+bool queue_underflow(queue_t* q){
+
+        if(underflowFlag){
+            return true;
+        }
+        else {
+            return false;
+        }
+}
+
+// Returns true if an overflow has occurred (queue_push() called on a full queue).
+bool queue_overflow(queue_t* q){
+
+    if(overflowFlag){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+// Prints the current contents of the queue. Handy for debugging.
+// This must print out the contents of the queue in the order of oldest element first to newest element last.
+// HINT: Just use queue_readElementAt() in a for-loop. Trivial to implement this way.
+void queue_print(queue_t* q){
+queue_data_t queue_value;
+    for(int i = INITIAL; i < q->size; i++){
+    queue_value = queue_readElementAt(q, i);
+        printf("index %d and value is %d", index, queue_value);
+    }
+}
+
+
+
+
+
+
 // Standard queue implementation that leaves one spot empty so easier to check for full/empty.
 void queue_init(queue_t* q, queue_size_t size, const char* name) {
   q->underflowFlag = false;  // True if queue_pop() is called on an empty queue.
