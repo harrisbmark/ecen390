@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include "queue.h"
 
+/**********************************************************************************/
+/* Function: main                                                                 */
+/* Purpose: To run the "Milestone 1" code.                                        */
+/* Returns: An integer value (back to the calling function).                      */
+/**********************************************************************************/
 int main()
 {
+    // Run the queue test and return 0.
     queue_runTest();
     return 0;
 }

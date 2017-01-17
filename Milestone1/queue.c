@@ -6,71 +6,13 @@
 
 #define QUEUE_INCREMENT_INDEX 1
 #define QUEUE_POP_UNDERFLOW_ERROR -1
+#define QUEUE_INDEX_GREATER_THAN_QUEUE_SIZE_ERROR -2
 
 // Uncomment line below to print out informational messages during queue operation.
 // #define QUEUE_PRINT_INFO_MESSAGES
 
 #define EMPTY_QUEUE 0
 #define INITIAL 0
-
-// Provides random-access read capability to the queue.
-// Low-valued indexes access older queue elements while higher-value indexes access newer elements
-// (according to the order that they were added).
-// Print a meaningful error message if an error condition is detected.
-queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
-    if(index >= q->size){
-        printf("That is not a valid index for the queue\n\r");
-        return QUEUE_POP_UNDERFLOW_ERROR;
-    }
-    else{
-        //printf("index out is: %d\n\r", q->indexOut);
-        //printf("value at the index is %lf\n\r", q->data[(index + q->indexOut) % q->size]);
-        return (q->data[(index + q->indexOut) % q->size]);
-    }
-
-}
-
-// Returns a count of the elements currently contained in the queue.
-queue_size_t queue_elementCount(queue_t* q){
-    return q->elementCount;
-    //return (abs(abs(q->size - q->indexOut) - abs(q->size - q->indexIn)));
-    //return q->indexOut > q->indexIn ? (q->size - q->indexOut + q->indexIn + 1) : (q->indexIn - q->indexOut + 1);
-}
-
-// Returns true if an underflow has occurred (queue_pop() called on an empty queue).
-bool queue_underflow(queue_t* q){
-
-        if(q->underflowFlag == true){
-            return true;
-        }
-        else {
-            return false;
-        }
-}
-
-// Returns true if an overflow has occurred (queue_push() called on a full queue).
-bool queue_overflow(queue_t* q){
-
-    if(q->overflowFlag == true){
-        return true;
-    }
-    else{
-        return false;
-    }
-}
-
-// Prints the current contents of the queue. Handy for debugging.
-// This must print out the contents of the queue in the order of oldest element first to newest element last.
-// HINT: Just use queue_readElementAt() in a for-loop. Trivial to implement this way.
-queue_data_t queue_value;
-void queue_print(queue_t* q){
-
-    for(uint8_t i = INITIAL; i < q->size; i++){ //THis is print 0 through 10 and it shouldnt print index 10....
-        queue_value = queue_readElementAt(q, i);
-        //printf("queue value is %d\n\r", queue_value);
-        printf("index %d and value is %lf\n\r", i, queue_readElementAt(q, i));
-    }
-}
 
 // Standard queue implementation that leaves one spot empty so easier to check for full/empty.
 void queue_init(queue_t* q, queue_size_t size, const char* name) {
@@ -94,6 +36,67 @@ void queue_init(queue_t* q, queue_size_t size, const char* name) {
 #endif
 }
 
+// Provides random-access read capability to the queue.
+// Low-valued indexes access older queue elements while higher-value indexes access newer elements
+// (according to the order that they were added).
+// Print a meaningful error message if an error condition is detected.
+queue_data_t queue_readElementAt(queue_t* q, queue_index_t index){
+    // If the index passed is greater than the size of the queue.
+    if(index >= q->size){
+        // Print out the error message to the user and return an index greater than queue size error.
+        printf("Error! The passed index is not a valid index for the queue!\n\r");
+        return QUEUE_INDEX_GREATER_THAN_QUEUE_SIZE_ERROR;
+    }
+    // Otherwise, return the value in the queue at the passed index.
+    else{
+        return (q->data[(index + q->indexOut) % q->size]);
+    }
+
+}
+
+// Returns a count of the elements currently contained in the queue.
+queue_size_t queue_elementCount(queue_t* q){
+    // Return the number of elements in the queue.
+    return q->elementCount;
+}
+
+// Returns true if an underflow has occurred (queue_pop() called on an empty queue).
+bool queue_underflow(queue_t* q){
+    // If the underflow flag is set, then return true.
+    if(q->underflowFlag == true){
+        return true;
+    }
+
+    // Otherwise, return false.
+    else {
+        return false;
+    }
+}
+
+// Returns true if an overflow has occurred (queue_push() called on a full queue).
+bool queue_overflow(queue_t* q){
+    // If the overflow flag is set, then return true.
+    if(q->overflowFlag == true){
+        return true;
+    }
+
+    // Otherwise, return false.
+    else{
+        return false;
+    }
+}
+
+// Prints the current contents of the queue. Handy for debugging.
+// This must print out the contents of the queue in the order of oldest element first to newest element last.
+// HINT: Just use queue_readElementAt() in a for-loop. Trivial to implement this way.
+void queue_print(queue_t* q){
+    // For each element in the queue.
+    for(uint8_t i = INITIAL; i < q->size; i++){
+        // Print the value at the desired index of the queue.
+        printf("index %d and value is %lf\n\r", i, queue_readElementAt(q, i));
+    }
+}
+
 // Tell the user size in terms of usable locations.
 queue_size_t queue_size(queue_t* q) {return q->size-1;}
 
@@ -104,12 +107,13 @@ queue_size_t queue_size(queue_t* q) {return q->size-1;}
 /**********************************************************************************/
 bool queue_full(queue_t* q)
 {
-
+    // If index in incremented one position is equal to the index out position, return true.
     if (((q->indexIn + QUEUE_INCREMENT_INDEX) % q->size) == q->indexOut)
     {
         return true;
     }
 
+    // Otherwise, return false.
     else
     {
         return false;
@@ -125,12 +129,13 @@ bool queue_full(queue_t* q)
 /**********************************************************************************/
 bool queue_empty(queue_t* q)
 {
-
+    // If the index out position is the same as the index in position, then return true.
     if (q->indexOut == q->indexIn)
     {
         return true;
     }
 
+    // Otherwise, return false.
     else
     {
         return false;
@@ -145,18 +150,24 @@ bool queue_empty(queue_t* q)
 /**********************************************************************************/
 void queue_push(queue_t* q, queue_data_t value)
 {
+    // If the queue is full.
     if (queue_full(q))
     {
+        // Set the overflow flag to true and print out the error message to the user.
         q->overflowFlag = true;
         printf("Error! Trying to push to queue when the queue is full!\n\r");
     }
 
+    // Otherwise.
     else
     {
+        // Set the underflow flag to false.
         q->underflowFlag = false;
-        q->elementCount++;
+
+        // Put the passed value into the position of the index in pointer, change what index in is pointing to, and increment the number of elements in the queue.
         q->data[q->indexIn] = value;
         q->indexIn = (q->indexIn + QUEUE_INCREMENT_INDEX) % q->size;
+        q->elementCount++;
     }
 }
 
@@ -167,21 +178,29 @@ void queue_push(queue_t* q, queue_data_t value)
 /**********************************************************************************/
 queue_data_t queue_pop(queue_t* q)
 {
+    // If the queue is empty.
     if (queue_empty(q))
     {
+        // Set the underflow flag for the queue to true and print out the error to the user.
         q->underflowFlag = true;
         printf("Error! Trying to pop from queue when the queue is empty!\n\r");
 
+        // Return a queue pop underflow error.
         return QUEUE_POP_UNDERFLOW_ERROR;
     }
 
+    // Otherwise.
     else
     {
+        // Set the overflow flag to false.
         q->overflowFlag = false;
-        q->elementCount--;
+
+        // Set the current value to be popped to a temporary value, set the indexOut pointer to the correct spot, and then decrement the number of elements in the queue.
         queue_data_t temp_value = q->data[q->indexOut];
         q->indexOut = (q->indexOut + QUEUE_INCREMENT_INDEX) % q->size;
+        q->elementCount--;
 
+        // Return the temp value (since this is a pop function after all).
         return temp_value;
     }
 }
@@ -193,11 +212,13 @@ queue_data_t queue_pop(queue_t* q)
 /**********************************************************************************/
 void queue_overwritePush(queue_t* q, queue_data_t value)
 {
+    // If the queue is full then pop the oldest element from the queue.
     if (queue_full(q))
     {
         queue_pop(q);
     }
 
+    // Push the new value onto the queue.
     queue_push(q, value);
 }
 
