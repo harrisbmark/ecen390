@@ -1,0 +1,11 @@
+figure(1);
+xlabel('Hertz');
+ylabel('Volts');
+plot(scope291(:, 1), scope291(:, 2))
+
+figure(2);
+x = scope301(:, 1);
+y = scope291(:, 2);
+xlabel('Hertz');
+ylabel('Volts');
+plot(x, y)
