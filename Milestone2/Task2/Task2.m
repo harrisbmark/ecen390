@@ -121,3 +121,5 @@ plot(f_axis,abs(FILTERED));
 actual_filter_pv = freqz(ideal_filter,1,PLAYER_FREQUENCIES,Fs);
 actual_filter_ob = freqz(ideal_filter,1,10E3:1E3:50E3,Fs);
 
+20*log10(max(abs(actual_filter_ob)));
+20*log10(min(abs(actual_filter_pv))/max(abs(actual_filter_pv)));
