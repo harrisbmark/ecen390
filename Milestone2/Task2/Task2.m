@@ -102,7 +102,6 @@ plot(f_axis,abs(H_ideal_FIR));
 
 short_filter_pv = freqz(h_ideal_FIR,1,PLAYER_FREQUENCIES,Fs);
 short_filter_ob = freqz(h_ideal_FIR,1,10E3:1E3:50E3,Fs);
-%% 
 
 figure(7);
 N = 81;
