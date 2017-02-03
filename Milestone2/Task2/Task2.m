@@ -1,4 +1,8 @@
 PLAYER_FREQUENCIES = [1471 1724 2000 2273 2632 2941 3333 3571 3846 4167];
+load('light.mat');
+load('scope_30.csv');
+E01 = scope_30(:,1);
+E02 = scope_30(:,2);
 
 Fs = 100E3;
 F1 = 3E3;
