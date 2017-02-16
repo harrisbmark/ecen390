@@ -32,8 +32,10 @@ for i = 1:length(P_FREQ)
     hold off;
 end
 
-save a1.txt a -ascii -double
-save b1.txt b -ascii -double
+a
+b
+% save a1.txt a -ascii -double
+% save b1.txt b -ascii -double
 
 for i = 1:length(P_FREQ)
     freq = P_FREQ(i);

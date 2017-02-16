@@ -1,9 +1,6 @@
 #include <stdint.h>
 #include "filter.h"
  
-
- 
- 
 //#define FILTER_SAMPLE_FREQUENCY_IN_KHZ 100
 //#define FILTER_FREQUENCY_COUNT 10
 //#define FILTER_FIR_DECIMATION_FACTOR 10  // FIR-filter needs this many new inputs to compute a new output.
@@ -13,10 +10,8 @@
 // Placed here for general access as they are essentially constant throughout
 // the code. The transmitter will also use these.
 const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 44, 38, 34, 30, 28, 26, 24};
- 
 // Filtering routines for the laser-tag project.
 // Filtering is performed by a two-stage filter, as described below.
- 
 // 1. First filter is a decimating FIR filter with a configurable number of taps and decimation factor.
 // 2. The output from the decimating FIR filter is passed through a bank of 10 IIR filters. The
 // characteristics of the IIR filter are fixed.
@@ -24,66 +19,60 @@ const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 
 /*********************************************************************************************************
 ****************************************** Main Filter Functions *****************************************
 **********************************************************************************************************/
- 
- 
+#define X_QUEUE_SIZE 81
+#define X_QUEUE_NAME "xQueue"
+#define Y_QUEUE_SIZE 11
+#define Y_QUEUE_NAME "yQueue"
+#define Z_QUEUE_SIZE 10
+#define Z_QUEUE_NAME "zQueue"
+#define OUTPUT_QUEUE_SIZE 2000
+#define OUTPUT_QUEUE_NAME "Output Queue"
+#define IIR_A_COEFF_COUNT 11
+#define IIR_B_COEFF_COUNT 11
+#define FIR_A_COEFF_COUNT 81
+#define FIR_B_COEFF_COUNT 81
+#define NUMBER_OF_PLAYERS 10
+#define FILTER_QUEUE_INIT_VALUE 0.0
 
- #define X_QUEUE_SIZE 81
- #define Y_QUEUE_SIZE 11
- #define Z_QUEUE_SIZE 10
- #define OUTPUT_QUEUE_SIZE 2000
- #define IIR_A_COEFFICIENT_COUNT 11
- #define IIR_B_COEFFICIENT_COUNT 11
- #define FIR_A_COEFFICIENT_COUNT 81
- #define FIR_B_COEFFICIENT_COUNT 81
- #define FILTER_IIR_FILTER_COUNT
- #define FILTER_FIR_FILTER_COUNT
- #define NUMBER_OF_PLAYERS 10
+const double FILTER_FIR_A_COEFF[FIR_A_COEFF_COUNT] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+const double FILTER_FIR_B_COEFF[FIR_B_COEFF_COUNT] = {0.000605461, 0.000525071, 0.000384491, 0.000173987, -0.000113605, -0.000474881, -0.000888139, -0.00130826, -0.00166636, -0.00187557, -0.00184324, -0.00148843, -0.000762255, 0.000332452, 0.00172625, 0.00327684, 0.00477448, 0.00596063, 0.00655915, 0.00631729, 0.00505164, 0.00269264, -0.000679508, -0.00481411, -0.00928992, -0.0135386, -0.0168916, -0.018647, -0.0181497, -0.0148759, -0.00851106, 0.000988489, 0.0133604, 0.0280333, 0.0441587, 0.0606765, 0.0764081, 0.0901668, 0.100875, 0.107671, 0.11, 0.107671, 0.100875, 0.0901668, 0.0764081, 0.0606765, 0.0441587, 0.0280333, 0.0133604, 0.000988489, -0.00851106, -0.0148759, -0.0181497, -0.018647, -0.0168916, -0.0135386, -0.00928992, -0.00481411, -0.000679508, 0.00269264, 0.00505164, 0.00631729, 0.00655915, 0.00596063, 0.00477448, 0.00327684, 0.00172625, 0.000332452, -0.000762255, -0.00148843, -0.00184324, -0.00187557, -0.00166636, -0.00130826, -0.000888139, -0.000474881, -0.000113605, 0.000173987, 0.000384491, 0.000525071, 0.000605461};
+const double FILTER_IIR_A_COEFF[NUMBER_OF_PLAYERS][IIR_A_COEFF_COUNT] = {{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -5.96377}, {-4.63779, -3.05913, -1.40717, 0.820109, 2.70809, 4.94798, 6.17019, 7.40929, 8.57431, 19.1253, 13.5022}, {8.64175, 5.69041, 5.16738, 7.83191, 14.6916, 20.1272, 26.8579, 34.3066, -40.3415, -26.156, -14.2788}, {-5.73747, 3.25804, 12.2016, 29.0824, 42.9742, 61.5788, 84.0353, 61.5375, 38.5897, 21.3023, 11.958}, {10.3929, 18.6515, 43.1798, 65.958, 98.2583, 139.285, -70.0197, -43.039,-22.1939, -8.54353, 4.81018}, {18.7582, 48.4408, 75.2304, 113.595, 163.051, 60.2988, 37.8129, 20.8735, 11.7173, 10.1837, 18.2761}, {42.3107, 64.6304, 96.2805, 136.481, -38.7338, -25.1136, -13.7098, -5.50883, 3.1282, 11.7154, 27.9234}, {41.2616, 59.1247, 80.6863, 17.9935, 12.7032, 8.13036, 5.35368, 4.86159, 7.36844, 13.8222, 18.9361}, {25.2685, 32.2764, -5.49791, -4.27551, -2.82016, -1.29725, 0.756045, 2.49654, 4.56147, 5.6882, 6.83051}, {7.90451, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328}};
+const double FILTER_IIR_B_COEFF[NUMBER_OF_PLAYERS][IIR_B_COEFF_COUNT] = {{0.000000000909285, 0.000000000909286, 0.000000000909286, 0.000000000909287, 0.000000000909287, 0.000000000909287, 0.000000000909283, 0.000000000909296, 0.000000000909264, 0.000000000909062, -0.0}, {0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.00000000454642, -0.00000000454643}, {-0.00000000454643, -0.00000000454644, -0.00000000454643, -0.00000000454643, -0.00000000454642, -0.00000000454648, -0.00000000454632, -0.00000000454531, -0.0, 0.0, 0.0}, {0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.00000000909285, 0.00000000909286, 0.00000000909286, 0.00000000909287}, {0.00000000909287, 0.00000000909287, 0.00000000909283, 0.00000000909296, 0.00000000909264, 0.00000000909062, -0.0, 0.0, 0.0, 0.0, 0.0}, {-0.0, -0.0, 0.0, 0.0, 0.0, -0.00000000909285, -0.00000000909286, -0.00000000909286, -0.00000000909287, -0.00000000909287, -0.00000000909287}, {-0.00000000909283, -0.00000000909296, -0.00000000909264, -0.00000000909062, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.0}, {0.0, 0.0, 0.0, 0.00000000454642, 0.00000000454643, 0.00000000454643, 0.00000000454644, 0.00000000454643, 0.00000000454643, 0.00000000454642, 0.00000000454648}, {0.00000000454632, 0.00000000454531, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0}, {0.0, -0.000000000909285, -0.000000000909286, -0.000000000909286, -0.000000000909287, -0.000000000909287, -0.000000000909287, -0.000000000909283, -0.000000000909296, -0.000000000909264, -0.000000000909062}};
+
+static queue_t zQueue[NUMBER_OF_PLAYERS];
+static queue_t xQueue;
+static queue_t yQueue;
+static queue_t outputQueue[NUMBER_OF_PLAYERS];
  
+void initXQueue()
+{
+	queue_init(xQueue, X_QUEUE_SIZE, X_QUEUE_NAME);
+	filter_fillQueue(xQueue, FILTER_QUEUE_INIT_VALUE);
+}
+
+void initYQueue()
+{
+	queue_init(yQueue, Y_QUEUE_SIZE, Y_QUEUE_NAME);
+	filter_fillQueue(yQueue, FILTER_QUEUE_INIT_VALUE);
+}
  
- static queue_t zQueue[FILTER_IIR_FILTER_COUNT];
- static queue_t xQueue[];
- static queue_t yQueue[];
- static queue_t outputQueue[]; 
- 
- void initXQueue(){
-	 //We are filling the x queues with zeros
-	 for(uint i = 0; i < ; i++){
-		 queue_init(&(xQueue[i]), X_QUEUE_SIZE);
-		 for(uint j = 0; j<X_QUEUE_SIZE; j++){
-			 queue_overwritePush(&(xQueue[i]), 0.0);//not sure if this should be i or j
-		 }
-	 }
- }
- void initYQueue(){
- 	 //We are filling the x queues with zeros
-	 for(uint i = 0; i < ; i++){
-		 queue_init(&(yQueue[i]), Y_QUEUE_SIZE);
-		 for(uint j = 0; j<Y_QUEUE_SIZE; j++){
-			 queue_overwritePush(&(yQueue[i]), 0.0);//not sure if this should be i or j
-		 }
-	 }
- }
- void initZQueue(){
-	 //We are filling the x queues with zeros
-	 for(uint i = 0; i < FILTER_IIR_FILTER_COUNT; i++){
-		 queue_init(&(zQueue[i]), Z_QUEUE_SIZE);
-		 for(uint j = 0; j<Z_QUEUE_SIZE; j++){
-			 queue_overwritePush(&(zQueue[i]), 0.0);//not sure if this should be i or j
-		 }
-	 }	 
- }
- void initOutputQueue(){
- 	 //We are filling the output queues with zeros
-	 for(uint i = 0; i < NUMBER_OF_PLAYERS; i++){
-		 queue_init(&(outputQueue[i]), OUTPUT_QUEUE_SIZE);
-		 for(uint j = 0; j<OUTPUT_QUEUE_SIZE; j++){
-			 queue_overwritePush(&(outputQueue[i]), 0.0);//not sure if this should be i or j
-		 }
-	 }	 
+ void initZQueue()
+ {
+	for(uint i = 0; i < NUMBER_OF_PLAYERS; i++)
+	{
+		 queue_init(zQueue[i], Z_QUEUE_SIZE, sprintf("%s #%d", Z_QUEUE_NAME, i));
+		 filter_fillQueue(zQueue[i], FILTER_QUEUE_INIT_VALUE);
+	}	 
  }
  
- 
- 
+void initOutputQueue()
+{
+	for(uint i = 0; i < NUMBER_OF_PLAYERS; i++)
+	{
+		queue_init(ouputQueue[i], OUTPUT_QUEUE_SIZE, sprintf("%s #%d", OUTPUT_QUEUE_NAME, i));
+		filter_fillQueue(ouputQueue[i], FILTER_QUEUE_INIT_VALUE);
+	}
+}
  
 // Must call this prior to using any filter functions.
 void filter_init(){
@@ -99,8 +88,12 @@ void filter_addNewInput(double x){
 }
  
 // Fills a queue with the given fillValue.
-void filter_fillQueue(queue_t* q, double fillValue){
-	
+void filter_fillQueue(queue_t* q, double fillValue)
+{
+	for(uint i = 0; i < q->size; i++)
+	{
+		queue_push(q, fillValue);
+	}
 }
  
 // Invokes the FIR-filter. Input is contents of xQueue.
