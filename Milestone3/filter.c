@@ -43,6 +43,27 @@ static queue_t xQueue;
 static queue_t yQueue;
 static queue_t zQueue[NUMBER_OF_PLAYERS];
 static queue_t outputQueue[NUMBER_OF_PLAYERS];
+
+void convolution(int *x_array, int size_of_x, int *y_array, int size_of_y){
+	int convolution_length = size_of_x + size_of_y - 1;
+	int convolution_array[convolution_length];
+		
+	for (int k = 0; k < convolution_length; k++){
+		convolution_array[k] = 0; 
+	}	
+	for (int m = 0; m < size_of_x; m++){
+		for(int n = size_of_y - 1; n >= 0 ; n--){
+
+			int b = m + n;
+			int change = x_array[m] * y_array[n];
+			for(int i = 0; i < convolution_length; i++){
+				if(b == i){
+					z_array[b] = z_array[b] + change; 
+				}
+			}
+		}
+	}	
+ }
  
 void initXQueue()
 {
@@ -84,7 +105,7 @@ void filter_init(){
  
 // Use this to copy an input into the input queue of the FIR-filter (xQueue).
 void filter_addNewInput(double x){
-	
+	queue_overwritePush(xQueue, x);
 }
  
 // Fills a queue with the given fillValue.
