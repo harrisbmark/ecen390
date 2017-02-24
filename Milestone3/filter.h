@@ -2,7 +2,7 @@
 #define FILTER_H_
  
 #include <stdint.h>
-#include "queue.h"
+#include "../Milestone1/queue.h"
  
 #define FILTER_SAMPLE_FREQUENCY_IN_KHZ 100
 #define FILTER_FREQUENCY_COUNT 10

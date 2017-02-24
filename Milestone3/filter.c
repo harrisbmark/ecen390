@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include "filter.h"
  
 //#define FILTER_SAMPLE_FREQUENCY_IN_KHZ 100
@@ -9,7 +11,6 @@
 // Not used in filter.h but are used to TEST the filter code.
 // Placed here for general access as they are essentially constant throughout
 // the code. The transmitter will also use these.
-const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 44, 38, 34, 30, 28, 26, 24};
 // Filtering routines for the laser-tag project.
 // Filtering is performed by a two-stage filter, as described below.
 // 1. First filter is a decimating FIR filter with a configurable number of taps and decimation factor.
@@ -19,6 +20,7 @@ const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 
 /*********************************************************************************************************
 ****************************************** Main Filter Functions *****************************************
 **********************************************************************************************************/
+#define DECIMATION_VALUE 10
 #define X_QUEUE_SIZE 81
 #define X_QUEUE_NAME "xQueue"
 #define Y_QUEUE_SIZE 11
@@ -33,6 +35,7 @@ const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 
 #define FIR_B_COEFF_COUNT 81
 #define NUMBER_OF_PLAYERS 10
 #define FILTER_QUEUE_INIT_VALUE 0.0
+#define QUEUE_STRING_SIZE 15
 
 const double FILTER_FIR_A_COEFF[FIR_A_COEFF_COUNT] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 const double FILTER_FIR_B_COEFF[FIR_B_COEFF_COUNT] = {0.000605461, 0.000525071, 0.000384491, 0.000173987, -0.000113605, -0.000474881, -0.000888139, -0.00130826, -0.00166636, -0.00187557, -0.00184324, -0.00148843, -0.000762255, 0.000332452, 0.00172625, 0.00327684, 0.00477448, 0.00596063, 0.00655915, 0.00631729, 0.00505164, 0.00269264, -0.000679508, -0.00481411, -0.00928992, -0.0135386, -0.0168916, -0.018647, -0.0181497, -0.0148759, -0.00851106, 0.000988489, 0.0133604, 0.0280333, 0.0441587, 0.0606765, 0.0764081, 0.0901668, 0.100875, 0.107671, 0.11, 0.107671, 0.100875, 0.0901668, 0.0764081, 0.0606765, 0.0441587, 0.0280333, 0.0133604, 0.000988489, -0.00851106, -0.0148759, -0.0181497, -0.018647, -0.0168916, -0.0135386, -0.00928992, -0.00481411, -0.000679508, 0.00269264, 0.00505164, 0.00631729, 0.00655915, 0.00596063, 0.00477448, 0.00327684, 0.00172625, 0.000332452, -0.000762255, -0.00148843, -0.00184324, -0.00187557, -0.00166636, -0.00130826, -0.000888139, -0.000474881, -0.000113605, 0.000173987, 0.000384491, 0.000525071, 0.000605461};
@@ -44,54 +47,69 @@ static queue_t yQueue;
 static queue_t zQueue[NUMBER_OF_PLAYERS];
 static queue_t outputQueue[NUMBER_OF_PLAYERS];
 
-void convolution(int *x_array, int size_of_x, int *y_array, int size_of_y){
-	int convolution_length = size_of_x + size_of_y - 1;
-	int convolution_array[convolution_length];
+static double last_power_computed = 0.0;
+
+queue_data_t* convolution(int32_t *x, int32_t size_of_x, int32_t *h, int32_t size_of_h){
+    int32_t convolution_length = size_of_x + size_of_h - 1;
+    queue_data_t* convolution_array = (queue_data_t *)malloc(sizeof(queue_data_t) * convolution_length);
 		
-	for (int k = 0; k < convolution_length; k++){
+	for (uint8_t k = 0; k < convolution_length; k++){
 		convolution_array[k] = 0; 
 	}	
-	for (int m = 0; m < size_of_x; m++){
-		for(int n = size_of_y - 1; n >= 0 ; n--){
 
-			int b = m + n;
-			int change = x_array[m] * y_array[n];
-			for(int i = 0; i < convolution_length; i++){
+	for (uint8_t m = 0; m < size_of_x; m++){
+		for(uint8_t n = size_of_h - 1; n >= 0 ; n--){
+		    int32_t b = m + n;
+		    int32_t change = x[m] * h[n];
+			for(uint8_t i = 0; i < convolution_length; i++){
 				if(b == i){
-					z_array[b] = z_array[b] + change; 
+				    convolution_array[b] = convolution_array[b] + change;
 				}
 			}
 		}
 	}	
+
+	return convolution_array;
  }
+
+double square(double value)
+{
+    return value * value;
+}
  
 void initXQueue()
 {
-	queue_init(xQueue, X_QUEUE_SIZE, X_QUEUE_NAME);
-	filter_fillQueue(xQueue, FILTER_QUEUE_INIT_VALUE);
+	queue_init(&xQueue, X_QUEUE_SIZE, X_QUEUE_NAME);
+	filter_fillQueue(&xQueue, FILTER_QUEUE_INIT_VALUE);
 }
 
 void initYQueue()
 {
-	queue_init(yQueue, Y_QUEUE_SIZE, Y_QUEUE_NAME);
-	filter_fillQueue(yQueue, FILTER_QUEUE_INIT_VALUE);
+	queue_init(&yQueue, Y_QUEUE_SIZE, Y_QUEUE_NAME);
+	filter_fillQueue(&yQueue, FILTER_QUEUE_INIT_VALUE);
 }
  
  void initZQueue()
- {
-	for(uint i = 0; i < NUMBER_OF_PLAYERS; i++)
-	{
-		 queue_init(zQueue[i], Z_QUEUE_SIZE, sprintf("%s #%d", Z_QUEUE_NAME, i));
-		 filter_fillQueue(zQueue[i], FILTER_QUEUE_INIT_VALUE);
-	}	 
- }
+{
+    char temp_string[QUEUE_STRING_SIZE];
+
+    for(uint8_t i = 0; i < NUMBER_OF_PLAYERS; i++)
+    {
+        sprintf(temp_string, "%s #%d", Z_QUEUE_NAME, i);
+        queue_init(&zQueue[i], Z_QUEUE_SIZE, temp_string);
+        filter_fillQueue(&zQueue[i], FILTER_QUEUE_INIT_VALUE);
+    }
+}
  
 void initOutputQueue()
 {
-	for(uint i = 0; i < NUMBER_OF_PLAYERS; i++)
+    char temp_string[QUEUE_STRING_SIZE];
+
+	for(uint8_t i = 0; i < NUMBER_OF_PLAYERS; i++)
 	{
-		queue_init(ouputQueue[i], OUTPUT_QUEUE_SIZE, sprintf("%s #%d", OUTPUT_QUEUE_NAME, i));
-		filter_fillQueue(ouputQueue[i], FILTER_QUEUE_INIT_VALUE);
+	    sprintf(temp_string, "%s #%d", OUTPUT_QUEUE_NAME, i);
+		queue_init(&outputQueue[i], OUTPUT_QUEUE_SIZE, temp_string);
+		filter_fillQueue(&outputQueue[i], FILTER_QUEUE_INIT_VALUE);
 	}
 }
  
@@ -105,7 +123,7 @@ void filter_init(){
  
 // Use this to copy an input into the input queue of the FIR-filter (xQueue).
 void filter_addNewInput(double x){
-	queue_overwritePush(xQueue, x);
+	queue_overwritePush(&xQueue, x);
 }
  
 // Fills a queue with the given fillValue.
@@ -120,13 +138,38 @@ void filter_fillQueue(queue_t* q, double fillValue)
 // Invokes the FIR-filter. Input is contents of xQueue.
 // Output is returned and is also pushed on to yQueue.
 double filter_firFilter(){
-	
+    queue_data_t temp_y = FILTER_QUEUE_INIT_VALUE;
+
+    for (uint8_t i = 0; i < FIR_B_COEFF_COUNT; i++)
+    {
+        temp_y += queue_readElementAt(&xQueue, FIR_B_COEFF_COUNT - 1 - i) * FILTER_FIR_B_COEFF[i];
+    }
+
+    queue_overwritePush(&yQueue, temp_y);
+
+    return temp_y;
 }
  
 // Use this to invoke a single iir filter. Input comes from yQueue.
 // Output is returned and is also pushed onto zQueue[filterNumber].
 double filter_iirFilter(uint16_t filterNumber){
-	
+    queue_data_t temp_z1 = FILTER_QUEUE_INIT_VALUE;
+    queue_data_t temp_z2 = FILTER_QUEUE_INIT_VALUE;
+
+    for (uint8_t i = 0; i < IIR_B_COEFF_COUNT; i++)
+    {
+        temp_z1 += queue_readElementAt(&yQueue, IIR_B_COEFF_COUNT - 1 - i) * FILTER_IIR_B_COEFF[filterNumber][i];
+    }
+
+    for (uint8_t i = 0; i < IIR_A_COEFF_COUNT; i++)
+    {
+        temp_z2 += queue_readElementAt(&zQueue[filterNumber], IIR_A_COEFF_COUNT - 1 - i) * FILTER_IIR_A_COEFF[filterNumber][i];
+    }
+
+    queue_overwritePush(&zQueue[filterNumber], (temp_z1 - temp_z2));
+    queue_overwritePush(&outputQueue[filterNumber], (temp_z1 - temp_z2));
+
+    return (temp_z1 - temp_z2);
 }
  
 // Use this to compute the power for values contained in an outputQueue.
@@ -140,12 +183,30 @@ double filter_iirFilter(uint16_t filterNumber){
 // Note that this function will probably need an array to keep track of these values for each
 // of the 10 output queues.
 double filter_computePower(uint16_t filterNumber, bool forceComputeFromScratch, bool debugPrint){
+	double temp_power = 0.0;
+
+	if (forceComputeFromScratch)
+	{
+        for (uint8_t i = 0; i < outputQueue->size; i++)
+        {
+            temp_power += (square(outputQueue->data[i]));
+        }
+	}
 	
+	else
+	{
+	    temp_power -= last_power_computed;
+	    temp_power += square(outputQueue->data[outputQueue->indexIn - 1]);
+	}
+
+	last_power_computed = square(outputQueue->data[outputQueue->indexOut]);
+
+	return temp_power;
 }
  
 // Returns the last-computed output power value for the IIR filter [filterNumber].
 double filter_getCurrentPowerValue(uint16_t filterNumber){
-	
+	return filter_computePower(filterNumber, false, false);
 }
  
 // Get a copy of the current power values.
@@ -171,65 +232,67 @@ void filter_getNormalizedPowerValues(double normalizedArray[], uint16_t* indexOf
 **********************************************************************************************************/
  
 // Returns the array of FIR coefficients.
-const double* filter_getFirCoefficientArray();{
-	
+const double* filter_getFirCoefficientArray(){
+	return FILTER_FIR_B_COEFF;
 } 
+
 // Returns the number of FIR coefficients.
-uint32_t filter_getFirCoefficientCount();{
-	
-} 
+uint32_t filter_getFirCoefficientCount(){
+    return FIR_B_COEFF_COUNT;
+}
+
 // Returns the array of coefficients for a particular filter number.
 const double* filter_getIirACoefficientArray(uint16_t filterNumber){
-	
+	return FILTER_IIR_A_COEFF[filterNumber];
 }
  
 // Returns the number of A coefficients.
 uint32_t filter_getIirACoefficientCount(){
-	
+	return IIR_A_COEFF_COUNT;
 }
  
 // Returns the array of coefficients for a particular filter number.
 const double* filter_getIirBCoefficientArray(uint16_t filterNumber){
-	
+	return FILTER_IIR_B_COEFF[filterNumber];
 }
  
 // Returns the number of B coefficients.
 uint32_t filter_getIirBCoefficientCount(){
-	
+	return IIR_B_COEFF_COUNT;
 }
  
 // Returns the size of the yQueue.
 uint32_t filter_getYQueueSize(){
-	
+	return yQueue.size;
 }
  
 // Returns the decimation value.
 uint16_t filter_getDecimationValue(){
-	
+	return DECIMATION_VALUE;
 }
  
 // Returns the address of xQueue.
 queue_t* filter_getXQueue(){
-	
+	return &xQueue;
 }
  
 // Returns the address of yQueue.
 queue_t* filter_getYQueue(){
-	
+	return &yQueue;
 }
  
 // Returns the address of zQueue for a specific filter number.
 queue_t* filter_getZQueue(uint16_t filterNumber){
-	
+	return &zQueue[filterNumber];
 }
  
 // Returns the address of the IIR output-queue for a specific filter-number.
 queue_t* filter_getIirOutputQueue(uint16_t filterNumber){
-	
+	return &outputQueue[filterNumber];
 }
  
 // Returns the address of the firOutputDebugQueue.
 //queue_t* filter_getFirOutputDebugQueue();
  
 //void filter_runTest();
- 
+
