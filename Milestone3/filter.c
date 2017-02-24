@@ -49,29 +49,6 @@ static queue_t outputQueue[NUMBER_OF_PLAYERS];
 
 static double last_power_computed = 0.0;
 
-queue_data_t* convolution(int32_t *x, int32_t size_of_x, int32_t *h, int32_t size_of_h){
-    int32_t convolution_length = size_of_x + size_of_h - 1;
-    queue_data_t* convolution_array = (queue_data_t *)malloc(sizeof(queue_data_t) * convolution_length);
-		
-	for (uint8_t k = 0; k < convolution_length; k++){
-		convolution_array[k] = 0; 
-	}	
-
-	for (uint8_t m = 0; m < size_of_x; m++){
-		for(uint8_t n = size_of_h - 1; n >= 0 ; n--){
-		    int32_t b = m + n;
-		    int32_t change = x[m] * h[n];
-			for(uint8_t i = 0; i < convolution_length; i++){
-				if(b == i){
-				    convolution_array[b] = convolution_array[b] + change;
-				}
-			}
-		}
-	}	
-
-	return convolution_array;
- }
-
 double square(double value)
 {
     return value * value;
