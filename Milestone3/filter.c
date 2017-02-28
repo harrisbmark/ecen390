@@ -1,8 +1,13 @@
+/*********************************************************************************************************/
+/* File: filter.c                                                                                        */
+/* Date: Feb 24, 2017                                                                                    */
+/* Authors: Kelly Martin, Mark Harris                                                                     */
+/*********************************************************************************************************/
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "filter.h"
- 
+
 //#define FILTER_SAMPLE_FREQUENCY_IN_KHZ 100
 //#define FILTER_FREQUENCY_COUNT 10
 //#define FILTER_FIR_DECIMATION_FACTOR 10  // FIR-filter needs this many new inputs to compute a new output.
@@ -16,139 +21,288 @@
 // 1. First filter is a decimating FIR filter with a configurable number of taps and decimation factor.
 // 2. The output from the decimating FIR filter is passed through a bank of 10 IIR filters. The
 // characteristics of the IIR filter are fixed.
- 
+
 /*********************************************************************************************************
 ****************************************** Main Filter Functions *****************************************
 **********************************************************************************************************/
-#define DECIMATION_VALUE 10
-#define X_QUEUE_SIZE 81
-#define X_QUEUE_NAME "xQueue"
-#define Y_QUEUE_SIZE 11
-#define Y_QUEUE_NAME "yQueue"
-#define Z_QUEUE_SIZE 10
-#define Z_QUEUE_NAME "zQueue"
-#define OUTPUT_QUEUE_SIZE 2000
-#define OUTPUT_QUEUE_NAME "Output Queue"
-#define IIR_A_COEFF_COUNT 11
-#define IIR_B_COEFF_COUNT 11
-#define FIR_A_COEFF_COUNT 81
-#define FIR_B_COEFF_COUNT 81
-#define NUMBER_OF_PLAYERS 10
+// Define used to control the number of players for the game.
+#define FILTER_NUMBER_OF_PLAYERS 10
+
+// Define used to control the decimation value.
+#define FILTER_DECIMATION_VALUE 10
+
+// Defines used to control the xQueue queue size and name.
+#define FILTER_X_QUEUE_SIZE 81
+#define FILTER_X_QUEUE_NAME "xQueue"
+
+// Defines used to control the yQueue queue size and name.
+#define FILTER_Y_QUEUE_SIZE 11
+#define FILTER_Y_QUEUE_NAME "yQueue"
+
+// Defines used to control the zQueue queue size and name.
+#define FILTER_Z_QUEUE_SIZE 10
+#define FILTER_FILTER_Z_QUEUE_NAME "zQueue"
+
+// Defines used to control the output queue size and name.
+#define FILTER_OUTPUT_QUEUE_SIZE 2000
+#define FILTER_OUTPUT_QUEUE_NAME "Output Queue"
+
+// Defines used for the size of the IIR A and B coefficient arrays.
+#define FILTER_IIR_A_COEFF_COUNT 10
+#define FILTER_IIR_B_COEFF_COUNT 11
+
+// Defines used for the size of the FIR A and B coefficient arrays.
+#define FILTER_FIR_A_COEFF_COUNT 81
+#define FILTER_FIR_B_COEFF_COUNT 81
+
+// Defines used to give a queue init value and default string size.
 #define FILTER_QUEUE_INIT_VALUE 0.0
-#define QUEUE_STRING_SIZE 15
+#define QUEUE_STRING_SIZE 20
 
-const double FILTER_FIR_A_COEFF[FIR_A_COEFF_COUNT] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-const double FILTER_FIR_B_COEFF[FIR_B_COEFF_COUNT] = {0.000605461, 0.000525071, 0.000384491, 0.000173987, -0.000113605, -0.000474881, -0.000888139, -0.00130826, -0.00166636, -0.00187557, -0.00184324, -0.00148843, -0.000762255, 0.000332452, 0.00172625, 0.00327684, 0.00477448, 0.00596063, 0.00655915, 0.00631729, 0.00505164, 0.00269264, -0.000679508, -0.00481411, -0.00928992, -0.0135386, -0.0168916, -0.018647, -0.0181497, -0.0148759, -0.00851106, 0.000988489, 0.0133604, 0.0280333, 0.0441587, 0.0606765, 0.0764081, 0.0901668, 0.100875, 0.107671, 0.11, 0.107671, 0.100875, 0.0901668, 0.0764081, 0.0606765, 0.0441587, 0.0280333, 0.0133604, 0.000988489, -0.00851106, -0.0148759, -0.0181497, -0.018647, -0.0168916, -0.0135386, -0.00928992, -0.00481411, -0.000679508, 0.00269264, 0.00505164, 0.00631729, 0.00655915, 0.00596063, 0.00477448, 0.00327684, 0.00172625, 0.000332452, -0.000762255, -0.00148843, -0.00184324, -0.00187557, -0.00166636, -0.00130826, -0.000888139, -0.000474881, -0.000113605, 0.000173987, 0.000384491, 0.000525071, 0.000605461};
-const double FILTER_IIR_A_COEFF[NUMBER_OF_PLAYERS][IIR_A_COEFF_COUNT] = {{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -5.96377}, {-4.63779, -3.05913, -1.40717, 0.820109, 2.70809, 4.94798, 6.17019, 7.40929, 8.57431, 19.1253, 13.5022}, {8.64175, 5.69041, 5.16738, 7.83191, 14.6916, 20.1272, 26.8579, 34.3066, -40.3415, -26.156, -14.2788}, {-5.73747, 3.25804, 12.2016, 29.0824, 42.9742, 61.5788, 84.0353, 61.5375, 38.5897, 21.3023, 11.958}, {10.3929, 18.6515, 43.1798, 65.958, 98.2583, 139.285, -70.0197, -43.039,-22.1939, -8.54353, 4.81018}, {18.7582, 48.4408, 75.2304, 113.595, 163.051, 60.2988, 37.8129, 20.8735, 11.7173, 10.1837, 18.2761}, {42.3107, 64.6304, 96.2805, 136.481, -38.7338, -25.1136, -13.7098, -5.50883, 3.1282, 11.7154, 27.9234}, {41.2616, 59.1247, 80.6863, 17.9935, 12.7032, 8.13036, 5.35368, 4.86159, 7.36844, 13.8222, 18.9361}, {25.2685, 32.2764, -5.49791, -4.27551, -2.82016, -1.29725, 0.756045, 2.49654, 4.56147, 5.6882, 6.83051}, {7.90451, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328, 0.903328}};
-const double FILTER_IIR_B_COEFF[NUMBER_OF_PLAYERS][IIR_B_COEFF_COUNT] = {{0.000000000909285, 0.000000000909286, 0.000000000909286, 0.000000000909287, 0.000000000909287, 0.000000000909287, 0.000000000909283, 0.000000000909296, 0.000000000909264, 0.000000000909062, -0.0}, {0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.00000000454642, -0.00000000454643}, {-0.00000000454643, -0.00000000454644, -0.00000000454643, -0.00000000454643, -0.00000000454642, -0.00000000454648, -0.00000000454632, -0.00000000454531, -0.0, 0.0, 0.0}, {0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.00000000909285, 0.00000000909286, 0.00000000909286, 0.00000000909287}, {0.00000000909287, 0.00000000909287, 0.00000000909283, 0.00000000909296, 0.00000000909264, 0.00000000909062, -0.0, 0.0, 0.0, 0.0, 0.0}, {-0.0, -0.0, 0.0, 0.0, 0.0, -0.00000000909285, -0.00000000909286, -0.00000000909286, -0.00000000909287, -0.00000000909287, -0.00000000909287}, {-0.00000000909283, -0.00000000909296, -0.00000000909264, -0.00000000909062, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.0}, {0.0, 0.0, 0.0, 0.00000000454642, 0.00000000454643, 0.00000000454643, 0.00000000454644, 0.00000000454643, 0.00000000454643, 0.00000000454642, 0.00000000454648}, {0.00000000454632, 0.00000000454531, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0}, {0.0, -0.000000000909285, -0.000000000909286, -0.000000000909286, -0.000000000909287, -0.000000000909287, -0.000000000909287, -0.000000000909283, -0.000000000909296, -0.000000000909264, -0.000000000909062}};
+// Constant defined to hold all of the FIR A coefficient values (1x81).
+const double FILTER_FIR_A_COEFF[FILTER_FIR_A_COEFF_COUNT] = {
+	1.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00,
+	0.0000000000000000e+00, 0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,   0.0000000000000000e+00,
+	0.0000000000000000e+00
+};
 
+// Constant used to hold all of the FIR B coefficient values (1x81).
+const double FILTER_FIR_B_COEFF[FILTER_FIR_B_COEFF_COUNT] = {
+	6.0546138291252597e-04,   5.2507143315267811e-04,   3.8449091272701525e-04,   1.7398667197948182e-04,  -1.1360489934931548e-04,
+	-4.7488111478632532e-04,  -8.8813878356223768e-04,  -1.3082618178394971e-03,  -1.6663618496969908e-03,  -1.8755700366336781e-03,
+	-1.8432363328817916e-03,  -1.4884258721727399e-03,  -7.6225514924622853e-04,   3.3245249132384837e-04,   1.7262548802593762e-03,
+	3.2768418720744217e-03,   4.7744814146589041e-03,   5.9606317814670249e-03,   6.5591485566565593e-03,   6.3172870282586493e-03,
+	5.0516421324586546e-03,   2.6926388909554420e-03,  -6.7950808883015244e-04,  -4.8141100026888716e-03,  -9.2899200683230643e-03,
+	-1.3538595939086505e-02,  -1.6891587875325020e-02,  -1.8646984919441702e-02,  -1.8149697899123560e-02,  -1.4875876924586697e-02,
+	-8.5110608557150517e-03,   9.8848931927316319e-04,   1.3360421141947857e-02,   2.8033301291042201e-02,   4.4158668590312596e-02,
+	6.0676486642862550e-02,   7.6408062643700314e-02,   9.0166807112971648e-02,   1.0087463525509034e-01,   1.0767073207825099e-01,
+	1.1000000000000000e-01,   1.0767073207825099e-01,   1.0087463525509034e-01,   9.0166807112971648e-02,   7.6408062643700314e-02,
+	6.0676486642862550e-02,   4.4158668590312596e-02,   2.8033301291042201e-02,   1.3360421141947857e-02,   9.8848931927316319e-04,
+	-8.5110608557150517e-03,  -1.4875876924586697e-02,  -1.8149697899123560e-02,  -1.8646984919441702e-02,  -1.6891587875325020e-02,
+	-1.3538595939086505e-02,  -9.2899200683230643e-03,  -4.8141100026888716e-03,  -6.7950808883015244e-04,   2.6926388909554420e-03,
+	5.0516421324586546e-03,   6.3172870282586493e-03,   6.5591485566565593e-03,   5.9606317814670249e-03,   4.7744814146589041e-03,
+	3.2768418720744217e-03,   1.7262548802593762e-03,   3.3245249132384837e-04,  -7.6225514924622853e-04,  -1.4884258721727399e-03,
+	-1.8432363328817916e-03,  -1.8755700366336781e-03,  -1.6663618496969908e-03,  -1.3082618178394971e-03,  -8.8813878356223768e-04,
+	-4.7488111478632532e-04,  -1.1360489934931548e-04,   1.7398667197948182e-04,   3.8449091272701525e-04,   5.2507143315267811e-04,   6.0546138291252597e-04
+};
+
+// Constant used to hold all of the IIR A coefficient values (10x10).
+const double FILTER_IIR_A_COEFF[FILTER_NUMBER_OF_PLAYERS][FILTER_IIR_A_COEFF_COUNT] = {
+	{-5.9637727070163997e+00, 1.9125339333078244e+01, -4.0341474540744173e+01, 6.1537466875368821e+01, -7.0019717951472202e+01, 6.0298814235238908e+01, -3.8733792862566332e+01, 1.7993533279581083e+01, -5.4979061224867767e+00, 9.0332828533799836e-01},
+	{-4.6377947119071452e+00, 1.3502215749461570e+01, -2.6155952405269751e+01, 3.8589668330738320e+01, -4.3038990303252589e+01, 3.7812927599537076e+01, -2.5113598088113736e+01, 1.2703182701888053e+01, -4.2755083391143343e+00, 9.0332828533799814e-01},
+	{-3.0591317915750906e+00, 8.6417489609637368e+00, -1.4278790253808808e+01, 2.1302268283304240e+01, -2.2193853972079143e+01, 2.0873499791105353e+01, -1.3709764520609323e+01, 8.1303553577931247e+00, -2.8201643879900344e+00, 9.0332828533799470e-01},
+	{-1.4071749185996769e+00, 5.6904141470697560e+00, -5.7374718273676368e+00, 1.1958028362868911e+01, -8.5435280598354737e+00, 1.1717345583835968e+01, -5.5088290876998691e+00, 5.3536787286077665e+00, -1.2972519209655604e+00, 9.0332828533799980e-01},
+	{8.2010906117760274e-01, 5.1673756579268604e+00, 3.2580350909220908e+00, 1.0392903763919191e+01, 4.8101776408669057e+00, 1.0183724507092506e+01, 3.1282000712126736e+00, 4.8615933365571973e+00, 7.5604535083144853e-01, 9.0332828533799969e-01},
+	{2.7080869856154481e+00, 7.8319071217995537e+00, 1.2201607990980708e+01, 1.8651500443681556e+01, 1.8758157568004464e+01, 1.8276088095998926e+01, 1.1715361303018827e+01, 7.3684394621253020e+00, 2.4965418284511718e+00, 9.0332828533799703e-01},
+	{4.9479835250075910e+00, 1.4691607003177603e+01, 2.9082414772101068e+01, 4.3179839108869345e+01, 4.8440791644688900e+01, 4.2310703962394356e+01, 2.7923434247706446e+01, 1.3822186510471017e+01, 4.5614664160654375e+00, 9.0332828533799958e-01},
+	{6.1701893352279864e+00, 2.0127225876810350e+01, 4.2974193398071741e+01, 6.5958045321253593e+01, 7.5230437667866795e+01, 6.4630411355740080e+01, 4.1261591079244290e+01, 1.8936128791950622e+01, 5.6881982915180593e+00, 9.0332828533800336e-01},
+	{7.4092912870072425e+00, 2.6857944460290160e+01, 6.1578787811202332e+01, 9.8258255839887511e+01, 1.1359460153696327e+02, 9.6280452143026380e+01, 5.9124742025776612e+01, 2.5268527576524320e+01, 6.8305064480743436e+00, 9.0332828533800535e-01},
+	{8.5743055776347692e+00, 3.4306584753117903e+01, 8.4035290411037110e+01, 1.3928510844056831e+02, 1.6305115418161648e+02, 1.3648147221895817e+02, 8.0686288623299944e+01, 3.2276361903872200e+01, 7.9045143816244963e+00, 9.0332828533800003e-01}
+};
+
+// Constant used to hold all of the IIR B coefficient values (10x11).
+const double FILTER_IIR_B_COEFF[FILTER_NUMBER_OF_PLAYERS][FILTER_IIR_B_COEFF_COUNT] = {
+	{9.0928451882350956e-10,  -0.0000000000000000e+00,  -4.5464225941175478e-09,  -0.0000000000000000e+00,   9.0928451882350956e-09,  -0.0000000000000000e+00,  -9.0928451882350956e-09,  -0.0000000000000000e+00,   4.5464225941175478e-09,  -0.0000000000000000e+00,  -9.0928451882350956e-10},
+	{9.0928639888111007e-10,   0.0000000000000000e+00,  -4.5464319944055494e-09,   0.0000000000000000e+00,   9.0928639888110988e-09,   0.0000000000000000e+00,  -9.0928639888110988e-09,   0.0000000000000000e+00,   4.5464319944055494e-09,   0.0000000000000000e+00,  -9.0928639888111007e-10},
+	{9.0928646492642129e-10,   0.0000000000000000e+00,  -4.5464323246321064e-09,   0.0000000000000000e+00,   9.0928646492642127e-09,   0.0000000000000000e+00,  -9.0928646492642127e-09,   0.0000000000000000e+00,   4.5464323246321064e-09,   0.0000000000000000e+00,  -9.0928646492642129e-10},
+	{9.0928706182467255e-10,   0.0000000000000000e+00,  -4.5464353091233625e-09,   0.0000000000000000e+00,   9.0928706182467251e-09,   0.0000000000000000e+00,  -9.0928706182467251e-09,   0.0000000000000000e+00,   4.5464353091233625e-09,   0.0000000000000000e+00,  -9.0928706182467255e-10},
+	{9.0928658835421734e-10,   0.0000000000000000e+00,  -4.5464329417710870e-09,   0.0000000000000000e+00,   9.0928658835421740e-09,   0.0000000000000000e+00,  -9.0928658835421740e-09,   0.0000000000000000e+00,   4.5464329417710870e-09,   0.0000000000000000e+00,  -9.0928658835421734e-10},
+	{9.0928659616426674e-10,  -0.0000000000000000e+00,  -4.5464329808213341e-09,  -0.0000000000000000e+00,   9.0928659616426682e-09,  -0.0000000000000000e+00,  -9.0928659616426682e-09,  -0.0000000000000000e+00,   4.5464329808213341e-09,  -0.0000000000000000e+00,  -9.0928659616426674e-10},
+	{9.0928348598308410e-10,  -0.0000000000000000e+00,  -4.5464174299154200e-09,  -0.0000000000000000e+00,   9.0928348598308400e-09,  -0.0000000000000000e+00,  -9.0928348598308400e-09,  -0.0000000000000000e+00,   4.5464174299154200e-09,  -0.0000000000000000e+00,  -9.0928348598308410e-10},
+	{9.0929582752648066e-10,   0.0000000000000000e+00,  -4.5464791376324036e-09,   0.0000000000000000e+00,   9.0929582752648073e-09,   0.0000000000000000e+00,  -9.0929582752648073e-09,   0.0000000000000000e+00,   4.5464791376324036e-09,   0.0000000000000000e+00,  -9.0929582752648066e-10},
+	{9.0926389052076022e-10,   0.0000000000000000e+00,  -4.5463194526038007e-09,   0.0000000000000000e+00,   9.0926389052076014e-09,   0.0000000000000000e+00,  -9.0926389052076014e-09,   0.0000000000000000e+00,  4.5463194526038007e-09,   0.0000000000000000e+00,  -9.0926389052076022e-10},
+	{9.0906203307668878e-10,   0.0000000000000000e+00,  -4.5453101653834434e-09,   0.0000000000000000e+00,   9.0906203307668868e-09,   0.0000000000000000e+00,  -9.0906203307668868e-09,   0.0000000000000000e+00,   4.5453101653834434e-09,   0.0000000000000000e+00,  -9.0906203307668878e-10},
+};
+
+// Define the static variables used in the filter program (xQueue, yQueue, zQueue, outputQueue, and the last power computed).
 static queue_t xQueue;
 static queue_t yQueue;
-static queue_t zQueue[NUMBER_OF_PLAYERS];
-static queue_t outputQueue[NUMBER_OF_PLAYERS];
-
+static queue_t zQueue[FILTER_NUMBER_OF_PLAYERS];
+static queue_t outputQueue[FILTER_NUMBER_OF_PLAYERS];
 static double last_power_computed = 0.0;
 
+/*********************************************************************************************************/
+/* Function: square                                                                                      */
+/* Purpose: To return the square of a value passed to the function.                                      */
+/* Returns: A double value that is the square of the input.                                              */
+/*********************************************************************************************************/
 double square(double value)
 {
+	// Return the square value of the passed value (x^2, or value^2).
     return value * value;
 }
- 
+
+/*********************************************************************************************************/
+/* Function: initXQueue                                                                                  */
+/* Purpose: To initialize the xQueue for the program.                                                    */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void initXQueue()
 {
-	queue_init(&xQueue, X_QUEUE_SIZE, X_QUEUE_NAME);
-	filter_fillQueue(&xQueue, FILTER_QUEUE_INIT_VALUE);
+	// Initialize the queue and fill it with init values.
+    queue_init(&xQueue, FILTER_X_QUEUE_SIZE, "xQueue");
+    filter_fillQueue(&xQueue, FILTER_QUEUE_INIT_VALUE);
 }
 
+/*********************************************************************************************************/
+/* Function: initYQueue                                                                                  */
+/* Purpose: To initialize the yQueue for the program.                                                    */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void initYQueue()
 {
-	queue_init(&yQueue, Y_QUEUE_SIZE, Y_QUEUE_NAME);
-	filter_fillQueue(&yQueue, FILTER_QUEUE_INIT_VALUE);
+	// Initialize the queue and fill it with init values.
+    queue_init(&yQueue, FILTER_Y_QUEUE_SIZE, FILTER_Y_QUEUE_NAME);
+    filter_fillQueue(&yQueue, FILTER_QUEUE_INIT_VALUE);
 }
- 
+
+/*********************************************************************************************************/
+/* Function: initZQueue                                                                                  */
+/* Purpose: To initialize the zQueue for the program.                                                    */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
  void initZQueue()
 {
-    char temp_string[QUEUE_STRING_SIZE];
-
-    for(uint8_t i = 0; i < NUMBER_OF_PLAYERS; i++)
+	// For every single number of players (the number of filters used).
+    for(uint8_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
     {
-        sprintf(temp_string, "%s #%d", Z_QUEUE_NAME, i);
-        queue_init(&zQueue[i], Z_QUEUE_SIZE, temp_string);
+		// Create a temporary string variable (used for the queue name).
+    	char temp_string[QUEUE_STRING_SIZE];
+
+		// Create the queue name, initialize the queue, and fill it with queue init values.
+        sprintf(temp_string, "%s #%d", FILTER_FILTER_Z_QUEUE_NAME, i);
+        queue_init(&zQueue[i], FILTER_Z_QUEUE_SIZE, temp_string);
         filter_fillQueue(&zQueue[i], FILTER_QUEUE_INIT_VALUE);
     }
 }
- 
+
+/*********************************************************************************************************/
+/* Function: initOutputQueue                                                                             */
+/* Purpose: To initialize the output queue for the program.                                              */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void initOutputQueue()
 {
-    char temp_string[QUEUE_STRING_SIZE];
-
-	for(uint8_t i = 0; i < NUMBER_OF_PLAYERS; i++)
+	// For every single number of players (the number of filters used).
+    for(uint8_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
 	{
-	    sprintf(temp_string, "%s #%d", OUTPUT_QUEUE_NAME, i);
-		queue_init(&outputQueue[i], OUTPUT_QUEUE_SIZE, temp_string);
-		filter_fillQueue(&outputQueue[i], FILTER_QUEUE_INIT_VALUE);
-	}
+		// Create a temporary string variable (used for the queue name).
+		char temp_string[QUEUE_STRING_SIZE];
+
+		// Create the queue name, initialize the queue, and fill it will queue init values.
+		sprintf(temp_string, "%s #%d", FILTER_OUTPUT_QUEUE_NAME, i);
+        queue_init(&(outputQueue[i]), FILTER_OUTPUT_QUEUE_SIZE, temp_string);
+        filter_fillQueue(&outputQueue[i], FILTER_QUEUE_INIT_VALUE);
+    }
 }
- 
-// Must call this prior to using any filter functions.
+
+/*********************************************************************************************************/
+/* Function: filter_init                                                                                 */
+/* Purpose: To initialize all of the queues in the program.                                              */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void filter_init(){
-	initXQueue();
-	initYQueue();
-	initZQueue();
-	initOutputQueue();
+	// Initialize the x, y, z, and output queue for use in the program.
+    initXQueue();
+    initYQueue();
+    initZQueue();
+    initOutputQueue();
 }
- 
-// Use this to copy an input into the input queue of the FIR-filter (xQueue).
+
+/*********************************************************************************************************/
+/* Function: filter_addNewInput                                                                          */
+/* Purpose: To copy an input into the input queue of the FIR-filter (xQueue).                            */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void filter_addNewInput(double x){
-	queue_overwritePush(&xQueue, x);
+	// Push the input (x) onto the xQueue.
+    queue_overwritePush(&xQueue, x);
 }
- 
-// Fills a queue with the given fillValue.
+
+/*********************************************************************************************************/
+/* Function: filter_fillQueue                                                                            */
+/* Purpose: Fills a queue with the given fillValue.                                                      */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void filter_fillQueue(queue_t* q, double fillValue)
 {
-	for(uint i = 0; i < q->size; i++)
-	{
-		queue_push(q, fillValue);
-	}
+	// For every element in the passed queue.
+    for(uint i = 0; i < q->size; i++)
+    {
+		// Push the passed fill value into the queue.
+        queue_overwritePush(q, fillValue);
+    }
 }
- 
-// Invokes the FIR-filter. Input is contents of xQueue.
-// Output is returned and is also pushed on to yQueue.
+
+/*********************************************************************************************************/
+/* Function: filter_firFilter                                                                            */
+/* Purpose: Invokes the FIR-filter. Input is contents of xQueue.                                         */
+/* Returns: A double value that is the value pushed onto the yQueue.                                     */
+/*********************************************************************************************************/
 double filter_firFilter(){
+	// Create a temporary queue data type and initialize it with a queue init value.
     queue_data_t temp_y = FILTER_QUEUE_INIT_VALUE;
 
-    for (uint8_t i = 0; i < FIR_B_COEFF_COUNT; i++)
+	// For every FIR B coefficient value.
+    for (uint8_t i = 0; i < FILTER_FIR_B_COEFF_COUNT; i++)
     {
-        temp_y += queue_readElementAt(&xQueue, FIR_B_COEFF_COUNT - 1 - i) * FILTER_FIR_B_COEFF[i];
+		// Take the current value in the temporary queue data type and multiply it by the current xQueue value and B coefficient value.
+        temp_y += queue_readElementAt(&xQueue, FILTER_FIR_B_COEFF_COUNT - 1 - i) * FILTER_FIR_B_COEFF[i];
     }
 
+	// Push the temporary queue data type onto the yQueue.
     queue_overwritePush(&yQueue, temp_y);
 
+	// Return the temporary queue data type.
     return temp_y;
 }
- 
-// Use this to invoke a single iir filter. Input comes from yQueue.
-// Output is returned and is also pushed onto zQueue[filterNumber].
+
+/*********************************************************************************************************/
+/* Function: filter_iirFilter                                                                            */
+/* Purpose: To invoke a single iir filter. Input comes from yQueue.                                      */
+/* Returns: A double value that is the value pushed onto the zQueue[filterNumber].                       */
+/*********************************************************************************************************/
 double filter_iirFilter(uint16_t filterNumber){
+	// Create two temporary queue data type variables and initialize them with queue init values.
     queue_data_t temp_z1 = FILTER_QUEUE_INIT_VALUE;
     queue_data_t temp_z2 = FILTER_QUEUE_INIT_VALUE;
 
-    for (uint8_t i = 0; i < IIR_B_COEFF_COUNT; i++)
+	// For every IIR B coefficient value.
+    for (uint8_t i = 0; i < FILTER_IIR_B_COEFF_COUNT; i++)
     {
-        temp_z1 += queue_readElementAt(&yQueue, IIR_B_COEFF_COUNT - 1 - i) * FILTER_IIR_B_COEFF[filterNumber][i];
+		// Take the current value of the temporary queue value (z1) and add it to the current yQueue value and B coefficient value.
+        temp_z1 += queue_readElementAt(&yQueue, FILTER_IIR_B_COEFF_COUNT - 1 - i) * FILTER_IIR_B_COEFF[filterNumber][i];
     }
 
-    for (uint8_t i = 0; i < IIR_A_COEFF_COUNT; i++)
+	// For every IIR A coefficient value.
+    for (uint8_t i = 0; i < FILTER_IIR_A_COEFF_COUNT; i++)
     {
-        temp_z2 += queue_readElementAt(&zQueue[filterNumber], IIR_A_COEFF_COUNT - 1 - i) * FILTER_IIR_A_COEFF[filterNumber][i];
+		// Take the current value of the temporary queue value (z2) and add it to the current zQueue value and A coefficient value.
+        temp_z2 += queue_readElementAt(&zQueue[filterNumber], FILTER_IIR_A_COEFF_COUNT -1 - i) * FILTER_IIR_A_COEFF[filterNumber][i];
     }
 
+	// Push the value of the temporary queue data types z1 and z2 into the zQueue. Also push that value onto the outputQueue.
     queue_overwritePush(&zQueue[filterNumber], (temp_z1 - temp_z2));
     queue_overwritePush(&outputQueue[filterNumber], (temp_z1 - temp_z2));
 
+	// Return the difference between the temporary queue data types z1 and z2.
     return (temp_z1 - temp_z2);
 }
- 
+
 // Use this to compute the power for values contained in an outputQueue.
 // If force == true, then recompute power by using all values in the outputQueue.
 // This option is necessary so that you can correctly compute power values the first time.
@@ -159,117 +313,219 @@ double filter_iirFilter(uint16_t filterNumber){
 // 4. Compute new power as: prev-power - (oldest-value * oldest-value) + (newest-value * newest-value).
 // Note that this function will probably need an array to keep track of these values for each
 // of the 10 output queues.
+double previous_power[FILTER_NUMBER_OF_PLAYERS] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double current_power[FILTER_NUMBER_OF_PLAYERS] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double powerVals[FILTER_NUMBER_OF_PLAYERS];
+static double OLDEST_POWER[FILTER_NUMBER_OF_PLAYERS] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
 double filter_computePower(uint16_t filterNumber, bool forceComputeFromScratch, bool debugPrint){
-	double temp_power = 0.0;
+    double temp_power = 0.0;
+    double prev_power = 0.0;
+    double newest_value = 0.0;
+    double new_power = 0.0;
 
-	if (forceComputeFromScratch)
-	{
-        for (uint8_t i = 0; i < outputQueue->size; i++)
-        {
-            temp_power += (square(outputQueue->data[i]));
-        }
-	}
-	
-	else
-	{
-	    temp_power -= last_power_computed;
-	    temp_power += square(outputQueue->data[outputQueue->indexIn - 1]);
-	}
+    if (forceComputeFromScratch)
+    {
+		OLDEST_POWER[filterNumber] = queue_readElementAt(&outputQueue[filterNumber], 0);
 
-	last_power_computed = square(outputQueue->data[outputQueue->indexOut]);
+		for(uint16_t i = 0; i < FILTER_OUTPUT_QUEUE_SIZE; i++){
+					//queue_readElementAt
+			prev_power += queue_readElementAt(&outputQueue[filterNumber], i)*queue_readElementAt(&outputQueue[filterNumber], i);
+		}
 
-	return temp_power;
+		previous_power[filterNumber] = prev_power;
+		current_power[filterNumber] = prev_power;
+    }
+
+    else
+    {
+        newest_value = queue_readElementAt(&outputQueue[filterNumber], queue_elementCount(&outputQueue[filterNumber]) - 1);
+		new_power = previous_power[filterNumber] - (OLDEST_POWER[filterNumber]*OLDEST_POWER[filterNumber]) + (newest_value*newest_value);
+		current_power[filterNumber] = new_power;
+		OLDEST_POWER[filterNumber] = outputQueue[filterNumber].data[outputQueue[filterNumber].indexOut];
+		previous_power[filterNumber] = new_power;
+    }
+    
+   return current_power[filterNumber];
 }
- 
-// Returns the last-computed output power value for the IIR filter [filterNumber].
+
+/*********************************************************************************************************/
+/* Function: filter_getCurrentPowerValue                                                                 */
+/* Purpose: To return the last-computed output power value for the IIR filter [filterNumber].            */
+/* Returns: A double value that is the last-computed output power value for the IIR filter.              */
+/*********************************************************************************************************/
 double filter_getCurrentPowerValue(uint16_t filterNumber){
-	return filter_computePower(filterNumber, false, false);
+	// Return the current power for the passed filter number.
+    return current_power[filterNumber];
 }
- 
-// Get a copy of the current power values.
-// This function copies the already computed values into a previously-declared array
-// so that they can be accessed from outside the filter software by the detector.
-// Remember that when you pass an array into a C function, changes to the array within
-// that function are reflected in the returned array.
+
+/*********************************************************************************************************/
+/* Function: filter_getCurrentPowerValue                                                                 */
+/* Purpose: To copy the already computed values into a previously-declared array so that they can be     */
+/*          accessed from outside the filter software by the detector.                                   */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void filter_getCurrentPowerValues(double powerValues[]){
-	
+	// Set the power values to the current power.
+    powerValues = current_power;
 }
- 
-// Using the previously-computed power values that are current stored in currentPowerValue[] array,
-// Copy these values into the normalizedArray[] argument and then normalize them by dividing
-// all of the values in normalizedArray by the maximum power value contained in currentPowerValue[].
+
+/*********************************************************************************************************/
+/* Function: filter_getNormalizedPowerValues                                                             */
+/* Purpose: To normalize the previously computed power values by dividing all of the values in           */
+/*          normalizedArray by the maximum power value contained in currentPowerValue[].                 */
+/* Returns: VOID                                                                                         */
+/*********************************************************************************************************/
 void filter_getNormalizedPowerValues(double normalizedArray[], uint16_t* indexOfMaxValue){
+	// Create a temporary variable to hold the largest value in the array.
+    double largest_value = FILTER_QUEUE_INIT_VALUE;
+
+	// For every single player number.
+    for(uint8_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++){
+		// If the current power at the current index is greater than the temporary largest power value.
+        if(current_power[i] > largest_value){
+			// Set the largest power value to the current power at the current index.
+            largest_value = current_power[i];
+        }
+    }
 	
+	// Set the normalized array to be the current power array.
+    normalizedArray = current_power;
+
+	// For every single player number.
+    for(uint8_t j = 0; j < FILTER_NUMBER_OF_PLAYERS; j++){
+		// Normalize the power array by dividing all of the values in the array by the largest value.
+        normalizedArray[j] = normalizedArray[j]/largest_value;
+    }
 }
- 
+
 /*********************************************************************************************************
 ********************************** Verification-assisting functions. *************************************
 ********* Test functions access the internal data structures of the filter.c via these functions. ********
 *********************** These functions are not used by the main filter functions. ***********************
 **********************************************************************************************************/
- 
-// Returns the array of FIR coefficients.
+
+/*********************************************************************************************************/
+/* Function: filter_getFirCoefficientArray                                                               */
+/* Purpose: To return the FIR B coefficient array.                                                       */
+/* Returns: A const double pointer pointing to the FIR B coefficient array.                              */
+/*********************************************************************************************************/
 const double* filter_getFirCoefficientArray(){
-	return FILTER_FIR_B_COEFF;
-} 
+	// Return the FIR B coefficient array.
+    return FILTER_FIR_B_COEFF;
+}
 
-// Returns the number of FIR coefficients.
+/*********************************************************************************************************/
+/* Function: filter_getFirCoefficientCount                                                               */
+/* Purpose: To return the FIR B coefficient array count (number of elements).                            */
+/* Returns: An unsigned 32 bit integer value corresponding to the FIR B coefficient count.               */
+/*********************************************************************************************************/
 uint32_t filter_getFirCoefficientCount(){
-    return FIR_B_COEFF_COUNT;
+	// Returnt he nuber of FIR B coefficients.
+    return FILTER_FIR_B_COEFF_COUNT;
 }
 
-// Returns the array of coefficients for a particular filter number.
+/*********************************************************************************************************/
+/* Function: filter_getIirACoefficientArray                                                              */
+/* Purpose: To return the IIR A coefficient array.                                                       */
+/* Returns: A const double pointer pointing to the IIR A coefficient array.                              */
+/*********************************************************************************************************/
 const double* filter_getIirACoefficientArray(uint16_t filterNumber){
-	return FILTER_IIR_A_COEFF[filterNumber];
+	// Return the IIR A coefficient array (at the passed filter number).
+    return FILTER_IIR_A_COEFF[filterNumber];
 }
- 
-// Returns the number of A coefficients.
+
+/*********************************************************************************************************/
+/* Function: filter_getIirACoefficientCount                                                              */
+/* Purpose: To return the IIR A coefficient array count (number of elements).                            */
+/* Returns: An unsigned 32 bit integer value corresponding to the IIR A coefficient count.               */
+/*********************************************************************************************************/
 uint32_t filter_getIirACoefficientCount(){
-	return IIR_A_COEFF_COUNT;
+	// Return the number of IIR A coefficients.
+    return FILTER_IIR_A_COEFF_COUNT;
 }
- 
-// Returns the array of coefficients for a particular filter number.
+
+/*********************************************************************************************************/
+/* Function: filter_getIirBCoefficientArray                                                              */
+/* Purpose: To return the IIR B coefficient array.                                                       */
+/* Returns: A const double pointer pointing to the IIR B coefficient array.                              */
+/*********************************************************************************************************/
 const double* filter_getIirBCoefficientArray(uint16_t filterNumber){
-	return FILTER_IIR_B_COEFF[filterNumber];
+	// Return the IIR B coefficient array (at the passed filter number).
+    return FILTER_IIR_B_COEFF[filterNumber];
 }
- 
-// Returns the number of B coefficients.
+
+/*********************************************************************************************************/
+/* Function: filter_getIirBCoefficientCount                                                              */
+/* Purpose: To return the IIR B coefficient array count (number of elements).                            */
+/* Returns: An unsigned 32 bit integer value corresponding to the IIR B coefficient count.               */
+/*********************************************************************************************************/
 uint32_t filter_getIirBCoefficientCount(){
-	return IIR_B_COEFF_COUNT;
+	// Return the number of IIR B coefficients.
+    return FILTER_IIR_B_COEFF_COUNT;
 }
- 
-// Returns the size of the yQueue.
+
+/*********************************************************************************************************/
+/* Function: filter_getYQueueSize                                                                        */
+/* Purpose: To return the size of the yQueue.                                                            */
+/* Returns: An unsigned 32 bit integer value corresponding to the size of the yQueue.                    */
+/*********************************************************************************************************/
 uint32_t filter_getYQueueSize(){
-	return yQueue.size;
+	// Return the size of the yQueue.
+    return yQueue.size;
 }
- 
-// Returns the decimation value.
+
+/*********************************************************************************************************/
+/* Function: filter_getDecimationValue                                                                   */
+/* Purpose: To return the decimation value.                                                              */
+/* Returns: An unsigned 32 bit integer value corresponding to the decimation value.                      */
+/*********************************************************************************************************/
 uint16_t filter_getDecimationValue(){
-	return DECIMATION_VALUE;
+	// Return the decimation value.
+    return FILTER_DECIMATION_VALUE;
 }
- 
-// Returns the address of xQueue.
+
+/*********************************************************************************************************/
+/* Function: filter_getXQueue                                                                            */
+/* Purpose: To return the address of the xQueue.                                                         */
+/* Returns: A queue type corresponding to the address of the xQueue.                                     */
+/*********************************************************************************************************/
 queue_t* filter_getXQueue(){
-	return &xQueue;
+	// Return the address of the xQueue.
+    return &xQueue;
 }
- 
-// Returns the address of yQueue.
+
+/*********************************************************************************************************/
+/* Function: filter_getYQueue                                                                            */
+/* Purpose: To return the address of the yQueue.                                                         */
+/* Returns: A queue type corresponding to the address of the yQueue.                                     */
+/*********************************************************************************************************/
 queue_t* filter_getYQueue(){
-	return &yQueue;
+	// Return the address of the yQueue.
+    return &yQueue;
 }
- 
-// Returns the address of zQueue for a specific filter number.
+
+/*********************************************************************************************************/
+/* Function: filter_getZQueue                                                                            */
+/* Purpose: To return the address of the zQueue (at the passed filter number).                           */
+/* Returns: A queue type corresponding to the address of the zQueue (at the passed filter number).       */
+/*********************************************************************************************************/
 queue_t* filter_getZQueue(uint16_t filterNumber){
-	return &zQueue[filterNumber];
+	// Return the address of the zQueue for the passed filter number.
+    return &zQueue[filterNumber];
 }
- 
-// Returns the address of the IIR output-queue for a specific filter-number.
+
+/*********************************************************************************************************/
+/* Function: filter_getIirOutputQueue                                                                    */
+/* Purpose: To return the address of the outputQueue (at the passed filter number).                      */
+/* Returns: A queue type corresponding to the address of the outputQueue (at the passed filter number).  */
+/*********************************************************************************************************/
 queue_t* filter_getIirOutputQueue(uint16_t filterNumber){
-	return &outputQueue[filterNumber];
+	// Return the address of the outputQueue for the passed filter number.
+    return &outputQueue[filterNumber];
 }
- 
+
 // Returns the address of the firOutputDebugQueue.
 //queue_t* filter_getFirOutputDebugQueue();
- 
-//void filter_runTest();
 
+//void filter_runTest();
