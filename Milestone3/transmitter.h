@@ -26,9 +26,6 @@ void transmitter_setFrequencyNumber(uint16_t frequencyNumber);
 // Standard tick function.
 void transmitter_tick();
 
-// Tests the transmitter.
-void transmitter_runTest();
-
 // Runs the transmitter continuously.
 // if continuousModeFlag == true, transmitter runs continuously, otherwise, transmits one pulse-width and stops.
 // To set continuous mode, you must invoke this function prior to calling transmitter_run().
@@ -44,5 +41,8 @@ void transmitter_enableTestMode();
 // This is provided for testing as explained in the transmitter section of the web-page. When disabled,
 // debug prints that were previously enabled no longer appear.
 void transmitter_disableTestMode();
+
+// Tests the transmitter.
+void transmitter_runTest();
 
 #endif /* TRANSMITTER_H_ */

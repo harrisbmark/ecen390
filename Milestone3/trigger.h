@@ -17,4 +17,6 @@ void trigger_enable();
 // Standard tick function.
 void trigger_tick();
 
+void trigger_runTest();
+
 #endif /* TRIGGER_H_ */

@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #ifndef ISR_H_
 #define ISR_H_
 

@@ -24,5 +24,6 @@ void hitLedTimer_turnLedOn();
 // Turns the gun's hit-LED off.
 void hitLedTimer_turnLedOff();
 
+void hitLedTimer_runTest();
 
 #endif /* HITLEDTIMER_H_ */
