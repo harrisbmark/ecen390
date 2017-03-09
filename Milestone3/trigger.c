@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "trigger.h"
 #include "../Lab2/buttons.h"
+#include "supportFiles/utils.h"
 #include "supportFiles/mio.h"
 
 #define FIRE_TIME_UP 10 //Half a second
@@ -9,6 +10,9 @@
 #define INITIAL 0
 #define TRIGGER_GUN_TRIGGER_MIO_PIN 13
 #define GUN_TRIGGER_PRESSED 1
+
+#define TRIGGER_TEST_MS_DELAY 300
+
 // The trigger state machine debounces both the press and release of gun trigger.
 // Ultimately, it will activate the transmitter when a debounced press is detected.
 
@@ -69,25 +73,25 @@ static bool firstPass = true; //Create a variable called first pass
         //Set previous state to current state
         switch (triggerControl_currentState) { //Make a switch statement
         case triggerControl_idle_st: //Idle state case
-            printf("triggerControl_idle_st\n\r"); //Print idle state
+            //printf("triggerControl_idle_st\n\r"); //Print idle state
             break; //Break
         case triggerControl_debouncePullTimer_st:
             //Wait debounce pull timer state case
-            printf("triggerControl_debouncePullTimer_st\n\r");
+            //printf("triggerControl_debouncePullTimer_st\n\r");
             //Print debounce timer state
             break; //Break
         case triggerControl_fire_st: //Fire state case
-            printf("triggerControl_fire_st\n\r");
+            //printf("triggerControl_fire_st\n\r");
             printf("D\n\r");
             //Print the fire state
             break; //Break
         case triggerControl_waitTilReleased_st:
             //Wait til released state case
-            printf("triggerControl_waitTilReleased_st\n\r");
+            //printf("triggerControl_waitTilReleased_st\n\r");
             //Print wait til released state
             break; //Break
         case triggerControl_debounceReleaseTimer_st: //Debounce release timer state case
-            printf("triggerControl_debounceReleaseTimer_st\n\r"); //Print final state
+            //printf("triggerControl_debounceReleaseTimer_st\n\r"); //Print final state
             printf("U\n\r");
             break; //Break
         default: //Default case
@@ -188,7 +192,7 @@ void trigger_tick(){
     }
 }
 
-void trigger_runTest()
+/*void trigger_runTest()
 {
     printf("Started trigger run test...\n\r");
 
@@ -197,6 +201,25 @@ void trigger_runTest()
     while (!(buttons_read() & BUTTONS_BTN1_MASK))
     {
         trigger_tick();
+    }
+
+    printf("Ended trigger run test.\n\r");
+}*/
+
+void trigger_runTest()
+{
+    printf("Started trigger run test...\n\r");
+
+    trigger_init();
+
+    while (!(buttons_read() & BUTTONS_BTN1_MASK)) {}
+
+    if ((buttons_read() & BUTTONS_BTN1_MASK))
+    {
+        while ((buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            utils_msDelay(TRIGGER_TEST_MS_DELAY);
+        };
     }
 
     printf("Ended trigger run test.\n\r");

@@ -2,13 +2,16 @@
 #include <stdint.h>
 #include "lockoutTimer.h"
 #include "../Lab2/buttons.h"
+#include "../Lab3/intervalTimer.h"
 #include "supportFiles/utils.h"
 
-#define LOCKOUT_TIMER_TIME_UP 100
+#define LOCKOUT_TIMER_TIME_UP 50000
 #define LOCKOUT_TIMER_CLEAR 0
 
 #define LOCKOUT_TEST_COUNT 10
 #define LOCKOUT_TEST_MS_DELAY 1000
+
+#define LOCKOUT_TIMER_INTERVAL_TIMER 1
 
 enum lockoutTimer_st_t
 {
@@ -18,7 +21,7 @@ enum lockoutTimer_st_t
 
 volatile static bool lockout_timer_running;
 volatile static bool lockout_timer_hit_detected;
-volatile static uint8_t lockout_timer_count;
+volatile static uint32_t lockout_timer_count;
 
 void lockoutTimer_debug_print()
 {
@@ -89,6 +92,7 @@ void lockoutTimer_tick()
         case lockoutTimer_timer_st:
             if (lockout_timer_count >= LOCKOUT_TIMER_TIME_UP)
             {
+                lockout_timer_running = false;
                 lockout_timer_count = LOCKOUT_TIMER_CLEAR;
                 lockout_timer_current_state = lockoutTimer_idle_st;
             }
@@ -101,6 +105,8 @@ void lockoutTimer_tick()
             break;
 
         default:
+            lockout_timer_running = false;
+            lockout_timer_hit_detected = false;
             lockout_timer_count = LOCKOUT_TIMER_CLEAR;
             lockout_timer_current_state = lockoutTimer_idle_st;
             break;
@@ -109,17 +115,15 @@ void lockoutTimer_tick()
     switch (lockout_timer_current_state)
     {
         case lockoutTimer_idle_st:
-            lockout_timer_running = false;
             break;
 
         case lockoutTimer_timer_st:
-            lockout_timer_running = true;
             lockout_timer_count++;
             break;
     }
 }
 
-void lockoutTimer_runTest()
+/*void lockoutTimer_runTest()
 {
     printf("Started lockoutTimer run test...\n\r");
 
@@ -139,5 +143,22 @@ void lockoutTimer_runTest()
         utils_msDelay(LOCKOUT_TEST_MS_DELAY);
     }
 
+    printf("Ended lockoutTimer run test.\n\r");
+}*/
+
+void lockoutTimer_runTest()
+{
+    printf("Started lockoutTimer run test...\n\r");
+
+    lockoutTimer_init();
+    lockoutTimer_start();
+
+    intervalTimer_init(LOCKOUT_TIMER_INTERVAL_TIMER);
+    intervalTimer_reset(LOCKOUT_TIMER_INTERVAL_TIMER);
+    intervalTimer_start(LOCKOUT_TIMER_INTERVAL_TIMER);
+    while (lockoutTimer_running()) {}
+    intervalTimer_stop(LOCKOUT_TIMER_INTERVAL_TIMER);
+
+    printf("Timer ended with value of: %f", intervalTimer_getTotalDurationInSeconds(LOCKOUT_TIMER_INTERVAL_TIMER));
     printf("Ended lockoutTimer run test.\n\r");
 }

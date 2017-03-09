@@ -3,15 +3,16 @@
 #include "hitLedTimer.h"
 #include "lockoutTimer.h"
 #include "trigger.h"
+#include "isr.h"
 
 int main()
 {
-    //transmitter_runTest();
-    //hitLedTimer_runTest();
-    //lockoutTimer_runTest();
+    isr_init();
+
+    transmitter_runTest();
+    hitLedTimer_runTest();
+    lockoutTimer_runTest();
     trigger_runTest();
 
     return 0;
 }
-
-void isr_function() {}

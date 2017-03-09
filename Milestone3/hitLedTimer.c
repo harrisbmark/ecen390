@@ -6,18 +6,19 @@
 #include "supportFiles/utils.h"
 #include "supportFiles/mio.h"
 
-#define HIT_LED_TIMER_TIME_UP 6250000
+#define HIT_LED_TIMER_TIME_UP 50000
 #define HIT_LED_TIMER_CLEAR 0
 
-#define HIT_LED_JF3_MIO_PIN 11
+#define HIT_LED_JF_MIO_PIN 11
 #define HIT_LED_MIO_HIGH 1
 #define HIT_LED_MIO_LOW 0
 
 #define HIT_LED_ZYBO_ON 0x1
 #define HIT_LED_ZYBO_OFF 0x0
 
-#define HIT_LED_TEST_COUNT 10
-#define HIT_LED_TEST_MS_DELAY 1000
+//#define HIT_LED_TEST_COUNT 10
+#define HIT_LED_TEST_MS_DELAY 500
+#define HIT_LED_TEST_DEBOUCE 300
 
 enum hitLedTimer_st_t
 {
@@ -61,7 +62,7 @@ void hitLedTimer_init()
 
     leds_init(true);
     mio_init(false);
-    mio_setPinAsOutput(HIT_LED_JF3_MIO_PIN);
+    mio_setPinAsOutput(HIT_LED_JF_MIO_PIN);
 }
 
 // Calling this starts the timer.
@@ -80,7 +81,7 @@ bool hitLedTimer_running()
 // Standard tick function.
 void hitLedTimer_tick()
 {
-    hitLedTimer_debug_print();
+    //hitLedTimer_debug_print();
 
     switch (hit_led_timer_current_state)
     {
@@ -137,17 +138,17 @@ void hitLedTimer_tick()
 void hitLedTimer_turnLedOn()
 {
     leds_write(HIT_LED_ZYBO_ON);
-    mio_writePin(HIT_LED_JF3_MIO_PIN, HIT_LED_MIO_HIGH);
+    mio_writePin(HIT_LED_JF_MIO_PIN, HIT_LED_MIO_HIGH);
 }
 
 // Turns the gun's hit-LED off.
 void hitLedTimer_turnLedOff()
 {
     leds_write(HIT_LED_ZYBO_OFF);
-    mio_writePin(HIT_LED_JF3_MIO_PIN, HIT_LED_MIO_LOW);
+    mio_writePin(HIT_LED_JF_MIO_PIN, HIT_LED_MIO_LOW);
 }
 
-void hitLedTimer_runTest()
+/*void hitLedTimer_runTest()
 {
     printf("Starting hitLedTimer run test...\n\r");
 
@@ -165,6 +166,34 @@ void hitLedTimer_runTest()
         }
 
         utils_msDelay(HIT_LED_TEST_MS_DELAY);
+    }
+
+    hitLedTimer_turnLedOff();
+
+    printf("Ended hitLedTimer run test.\n\r");
+}*/
+
+void hitLedTimer_runTest()
+{
+    printf("Starting hitLedTimer run test...\n\r");
+
+    hitLedTimer_init();
+
+    while (!(buttons_read() & BUTTONS_BTN1_MASK))
+    {
+        hitLedTimer_start();
+
+        while(hitLedTimer_running()) {}
+
+        utils_msDelay(HIT_LED_TEST_MS_DELAY);
+    }
+
+    if ((buttons_read() & BUTTONS_BTN1_MASK))
+    {
+        while ((buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            utils_msDelay(HIT_LED_TEST_DEBOUCE);
+        };
     }
 
     hitLedTimer_turnLedOff();

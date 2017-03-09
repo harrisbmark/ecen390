@@ -3,6 +3,7 @@
 #include "hitLedTimer.h"
 #include "lockoutTimer.h"
 #include "trigger.h"
+#include "supportFiles/interrupts.h"
 
 // isr provides the isr_function() where you will place functions that require accurate timing.
 // A buffer for storing values from the Analog to Digital Converter (ADC) is implemented in isr.c
@@ -10,6 +11,11 @@
 // Performs inits for anything in isr.c
 void isr_init()
 {
+    interrupts_initAll(true);               // main interrupt init function.
+    interrupts_enableTimerGlobalInts();     // enable global interrupts.
+    interrupts_startArmPrivateTimer();      // start the main timer.
+    interrupts_enableArmInts();             // now the ARM processor can see interrupts.
+
     transmitter_init();
     hitLedTimer_init();
     lockoutTimer_init();
@@ -19,6 +25,10 @@ void isr_init()
 // This function is invoked by the timer interrupt at 100 kHz.
 void isr_function()
 {
+    transmitter_tick();
+    //hitLedTimer_tick();
+    //lockoutTimer_tick();
+    //trigger_tick();
 }
 
 /*******************************************************************

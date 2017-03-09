@@ -4,15 +4,21 @@
 #include "../Lab2/buttons.h"
 #include "../Lab2/switches.h"
 #include "supportFiles/utils.h"
+#include "supportFiles/mio.h"
 
-#define TRANSMITTER_FIRE_TIME 1000
+#define TRANSMITTER_FIRE_TIME 20000
 #define TRANSMITTER_HIGH_TIMER_CLEAR 0
 #define TRANSMITTER_LOW_TIMER_CLEAR 0
 #define TRANSMITTER_TIMER_CLEAR 0
 #define TRANSMITTER_FREQUENCY_CLEAR 0
 
+#define TRANSMITTER_JF_MIO_PIN 13
+#define TRANSMITTER_MIO_HIGH 1
+#define TRANSMITTER_MIO_LOW 0
+
 #define TRANSMITTER_FIRE_TIME_TESTING 200
 #define TRANSMITTER_TEST_PERIOD_MS 10
+#define TRANSMITTER_TEST_MS_DELAY 300
 
 enum transmitter_st_t
 {
@@ -72,6 +78,9 @@ void transmitter_init()
     transmitter_timer = TRANSMITTER_HIGH_TIMER_CLEAR;
     transmitter_high_timer = TRANSMITTER_HIGH_TIMER_CLEAR;
     transmitter_low_timer = TRANSMITTER_LOW_TIMER_CLEAR;
+
+    mio_init(false);
+    mio_setPinAsOutput(TRANSMITTER_JF_MIO_PIN);
 }
 
 // Starts the transmitter.
@@ -92,7 +101,7 @@ bool transmitter_running()
 // transmitter stops and transmitter_run() is called again.
 void transmitter_setFrequencyNumber(uint16_t frequencyNumber)
 {
-    transmitter_frequency = filter_frequencyTickTable[frequencyNumber % FILTER_FREQUENCY_COUNT];
+    transmitter_frequency = filter_frequencyTickTable[frequencyNumber % FILTER_FREQUENCY_COUNT]/2;
 }
 
 // Standard tick function.
@@ -107,6 +116,7 @@ void transmitter_tick()
             if (transmitter_trigger_detected)
             {
                 transmitter_trigger_detected = false;
+                mio_writePin(TRANSMITTER_JF_MIO_PIN, TRANSMITTER_MIO_HIGH);
                 transmitter_current_state = transmitter_fire_high_st;
             }
 
@@ -118,16 +128,18 @@ void transmitter_tick()
             break;
 
         case transmitter_fire_high_st:
-            if (transmitter_timer >= ((transmitter_test_mode) ? TRANSMITTER_FIRE_TIME : TRANSMITTER_FIRE_TIME_TESTING) && !transmitter_continuous_mode)
+            if (transmitter_timer >= TRANSMITTER_FIRE_TIME && !transmitter_continuous_mode)
             {
                 transmitter_timer = TRANSMITTER_TIMER_CLEAR;
                 transmitter_high_timer = TRANSMITTER_HIGH_TIMER_CLEAR;
+                mio_writePin(TRANSMITTER_JF_MIO_PIN, TRANSMITTER_MIO_LOW);
                 transmitter_current_state = transmitter_idle_st;
             }
 
-            else if (transmitter_high_timer >= transmitter_frequency && !(transmitter_timer >= ((transmitter_test_mode) ? TRANSMITTER_FIRE_TIME : TRANSMITTER_FIRE_TIME_TESTING)))
+            else if (transmitter_high_timer >= transmitter_frequency)
             {
                 transmitter_high_timer = TRANSMITTER_HIGH_TIMER_CLEAR;
+                mio_writePin(TRANSMITTER_JF_MIO_PIN, TRANSMITTER_MIO_LOW);
                 if (transmitter_test_mode)
                     printf("\n");
                 transmitter_current_state = transmitter_fire_low_st;
@@ -141,16 +153,18 @@ void transmitter_tick()
             break;
 
         case transmitter_fire_low_st:
-            if (transmitter_timer >= ((transmitter_test_mode) ? TRANSMITTER_FIRE_TIME : TRANSMITTER_FIRE_TIME_TESTING) && !transmitter_continuous_mode)
+            if (transmitter_timer >= TRANSMITTER_FIRE_TIME && !transmitter_continuous_mode)
             {
                 transmitter_timer = TRANSMITTER_TIMER_CLEAR;
                 transmitter_low_timer = TRANSMITTER_LOW_TIMER_CLEAR;
+                mio_writePin(TRANSMITTER_JF_MIO_PIN, TRANSMITTER_MIO_LOW);
                 transmitter_current_state = transmitter_idle_st;
             }
 
-            else if (transmitter_low_timer >= transmitter_frequency && !(transmitter_timer >= ((transmitter_test_mode) ? TRANSMITTER_FIRE_TIME : TRANSMITTER_FIRE_TIME_TESTING)))
+            else if (transmitter_low_timer >= transmitter_frequency)
             {
                 transmitter_low_timer = TRANSMITTER_LOW_TIMER_CLEAR;
+                mio_writePin(TRANSMITTER_JF_MIO_PIN, TRANSMITTER_MIO_HIGH);
                 if (transmitter_test_mode)
                     printf("\n");
                 transmitter_current_state = transmitter_fire_high_st;
@@ -254,14 +268,14 @@ void transmitter_disableTestMode()
     }
 }*/
 
-void transmitter_runTest()
+/*void transmitter_runTest()
 {
     printf("starting transmitter_runTest()\n\r");
 
     buttons_init();
     switches_init();
     transmitter_init();
-    transmitter_enableTestMode();
+    //transmitter_enableTestMode();
 
     while (!(buttons_read() & BUTTONS_BTN1_MASK))
     {
@@ -272,14 +286,72 @@ void transmitter_runTest()
 
         while (transmitter_running() && !(buttons_read() & BUTTONS_BTN1_MASK))
         {
-            transmitter_tick();
-            utils_msDelay(TRANSMITTER_TEST_PERIOD_MS);
+            //transmitter_tick();
+            //utils_msDelay(TRANSMITTER_TEST_PERIOD_MS);
         }
 
+        utils_msDelay(TRANSMITTER_TEST_PERIOD_MS);
         printf("\ncompleted one test period.\n\r");
     }
 
-    transmitter_disableTestMode();
+    //transmitter_disableTestMode();
 
     printf("exiting transmitter_runTest()\n\r");
+}*/
+
+void transmitter_runTest()
+{
+    printf("starting transmitter_runTest()\n\r");
+
+        buttons_init();
+        switches_init();
+        transmitter_init();
+
+        printf("starting non-continuous mode\n\r");
+
+        while (!(buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT;
+
+            transmitter_setFrequencyNumber(switchValue);
+            transmitter_run();
+
+            // Not continuous mode.
+            while (transmitter_running() && !(buttons_read() & BUTTONS_BTN1_MASK)) {}
+            utils_msDelay(TRANSMITTER_TEST_MS_DELAY);
+        }
+
+        if ((buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            while ((buttons_read() & BUTTONS_BTN1_MASK))
+            {
+                utils_msDelay(TRANSMITTER_TEST_MS_DELAY);
+            };
+        }
+
+        utils_msDelay(TRANSMITTER_TEST_MS_DELAY);
+
+        printf("starting continuous mode\n\r");
+
+        transmitter_setContinuousMode(true);
+        transmitter_run();
+        while (transmitter_running() && !(buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT;
+
+            transmitter_setFrequencyNumber(switchValue);
+        }
+
+
+        if ((buttons_read() & BUTTONS_BTN1_MASK))
+        {
+            while ((buttons_read() & BUTTONS_BTN1_MASK))
+            {
+                utils_msDelay(TRANSMITTER_TEST_MS_DELAY);
+            };
+        }
+
+        transmitter_setContinuousMode(false);
+
+        printf("transmitter_runTest() done\n\r");
 }
