@@ -1,18 +1,17 @@
-#include <stdio.h>
-#include "transmitter.h"
-#include "hitLedTimer.h"
-#include "lockoutTimer.h"
-#include "trigger.h"
-#include "isr.h"
+#include "runningModes.h"
+#include "filter.h"
+#include "filterTest.h"
+#include "../Lab2/buttons.h"
+#include <assert.h>
 
-int main()
-{
-    isr_init();
+#define BUTTONS_BTN2_MASK 0x4   // Bit mask for BTN2
 
-    transmitter_runTest();
-    hitLedTimer_runTest();
-    lockoutTimer_runTest();
-    trigger_runTest();
-
-    return 0;
+// The program comes up in continuous mode.
+// Hold BTN2 while the program starts to come up in shooter mode.
+int main() {
+  buttons_init();  // Init the buttons.
+    if (buttons_read() & BUTTONS_BTN2_MASK) // Read the buttons to see if BTN2 is drepressed.
+      runningModes_shooter();               // Run shooter mode if BTN2 is depressed.
+    else
+      runningModes_continuous();            // Otherwise, go to continuous mode.
 }
