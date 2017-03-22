@@ -5,6 +5,7 @@
 /*********************************************************************************************************/
 #include <stdio.h>
 #include "trigger.h"
+#include "transmitter.h"
 #include "../Lab2/buttons.h"
 #include "supportFiles/utils.h"
 #include "supportFiles/mio.h"
@@ -137,7 +138,7 @@ void triggerControl_stateDebugPrint() {
 /* Returns: VOID                                                                                         */
 /*********************************************************************************************************/
 void trigger_tick() {
-    triggerControl_stateDebugPrint(); //Call the state debug print
+    //triggerControl_stateDebugPrint(); //Call the state debug print
 
     //---------------------------------------->State actions
     switch (triggerControl_currentState) { //Create a switch statement
@@ -183,6 +184,7 @@ void trigger_tick() {
 
         case triggerControl_debouncePullTimer_st: //Wait debounce pull timer state case
             if(pullCount >= PULL_TIME_UP) {
+                transmitter_run();
                 triggerControl_currentState = triggerControl_fire_st;
                 //Set current state to fire state
             }
@@ -242,7 +244,7 @@ void trigger_tick() {
 /*********************************************************************************************************/
 /* Function: trigger_runTest                                                                             */
 /* Purpose: To test the trigger state machine.                                                           */
-/* Returns: VOID
+/* Returns: VOID                                                                                         */
 /*********************************************************************************************************/
 void trigger_runTest()
 {

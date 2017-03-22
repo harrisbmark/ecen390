@@ -12,6 +12,41 @@
 // Not used in filter.h but are used to TEST the filter code.
 // Placed here for general access as they are essentially constant throughout
 // the code. The transmitter will also use these.
+
+// Define used to control the number of players for the game.
+#define FILTER_NUMBER_OF_PLAYERS 10
+
+// Define used to control the decimation value.
+#define FILTER_DECIMATION_VALUE 10
+
+// Defines used to control the xQueue queue size and name.
+#define FILTER_X_QUEUE_SIZE 81
+#define FILTER_X_QUEUE_NAME "xQueue"
+
+// Defines used to control the yQueue queue size and name.
+#define FILTER_Y_QUEUE_SIZE 11
+#define FILTER_Y_QUEUE_NAME "yQueue"
+
+// Defines used to control the zQueue queue size and name.
+#define FILTER_Z_QUEUE_SIZE 10
+#define FILTER_FILTER_Z_QUEUE_NAME "zQueue"
+
+// Defines used to control the output queue size and name.
+#define FILTER_OUTPUT_QUEUE_SIZE 2000
+#define FILTER_OUTPUT_QUEUE_NAME "Output Queue"
+
+// Defines used for the size of the IIR A and B coefficient arrays.
+#define FILTER_IIR_A_COEFF_COUNT 10
+#define FILTER_IIR_B_COEFF_COUNT 11
+
+// Defines used for the size of the FIR A and B coefficient arrays.
+#define FILTER_FIR_A_COEFF_COUNT 81
+#define FILTER_FIR_B_COEFF_COUNT 81
+
+// Defines used to give a queue init value and default string size.
+#define FILTER_QUEUE_INIT_VALUE 0.0
+#define QUEUE_STRING_SIZE 20
+
 const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {68, 58, 50, 44, 38, 34, 30, 28, 26, 24};
  
 // Filtering routines for the laser-tag project.

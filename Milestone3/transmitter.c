@@ -244,61 +244,6 @@ void transmitter_disableTestMode()
     transmitter_test_mode = false;
 }
 
-// Tests the transmitter.
-/*void transmitter_runTest()
-{
-    transmitter_init();
-
-    for (uint8_t i = 0; i < FILTER_FREQUENCY_COUNT; i++)
-    {
-        transmitter_setFrequencyNumber(filter_frequencyTickTable[i]);
-        transmitter_run();
-
-        while (true)
-        {
-            printf("Fire time: %d\n\r", transmitter_timer);
-            printf("Current filter: %d\n\r", i);
-            transmitter_tick();
-
-            if (!transmitter_running())
-                break;
-        }
-
-        utils_msDelay(TRANSMITTER_TEST_MS_DELAY);
-    }
-}*/
-
-/*void transmitter_runTest()
-{
-    printf("starting transmitter_runTest()\n\r");
-
-    buttons_init();
-    switches_init();
-    transmitter_init();
-    //transmitter_enableTestMode();
-
-    while (!(buttons_read() & BUTTONS_BTN1_MASK))
-    {
-        uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT;
-
-        transmitter_setFrequencyNumber(switchValue);
-        transmitter_run();
-
-        while (transmitter_running() && !(buttons_read() & BUTTONS_BTN1_MASK))
-        {
-            //transmitter_tick();
-            //utils_msDelay(TRANSMITTER_TEST_PERIOD_MS);
-        }
-
-        utils_msDelay(TRANSMITTER_TEST_PERIOD_MS);
-        printf("\ncompleted one test period.\n\r");
-    }
-
-    //transmitter_disableTestMode();
-
-    printf("exiting transmitter_runTest()\n\r");
-}*/
-
 void transmitter_runTest()
 {
     printf("starting transmitter_runTest()\n\r");

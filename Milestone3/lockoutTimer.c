@@ -71,7 +71,7 @@ bool lockoutTimer_running()
 // Standard tick function.
 void lockoutTimer_tick()
 {
-    lockoutTimer_debug_print();
+    //lockoutTimer_debug_print();
 
     switch (lockout_timer_current_state)
     {
