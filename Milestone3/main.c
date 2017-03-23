@@ -3,7 +3,6 @@
     #include "filterTest.h"
     #include "../Lab2/buttons.h"
     #include <assert.h>
-#include <stdio.h>
 
     #define BUTTONS_BTN2_MASK 0x4   // Bit mask for BTN2
 
@@ -14,12 +13,10 @@
         if (buttons_read() & BUTTONS_BTN2_MASK)
         {
             // Read the buttons to see if BTN2 is drepressed.
-            printf("ShooterMode()\n\r");
           runningModes_shooter();               // Run shooter mode if BTN2 is depressed.
         }
         else
         {
-            printf("ContinuousMode()\n\r");
           runningModes_continuous();            // Otherwise, go to continuous mode.
         }
     }

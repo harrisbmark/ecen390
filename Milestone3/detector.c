@@ -9,17 +9,16 @@
 
 #define DETECTOR_CLEAR_HIT_COUNT 0
 #define DETECTOR_HALF_QUEUE 2
-#define DETECTOR_MAX_ADC_VALUE 4095
-#define DETECTOR_HALF_MAX_ADC_VALUE (DETECTOR_MAX_ADC_VALUE/2)
+#define DETECTOR_MAX_ADC_VALUE 4095.0
+#define DETECTOR_HALF_MAX_ADC_VALUE (DETECTOR_MAX_ADC_VALUE/2.0)
 #define DETECTOR_NEW_INPUT_COUNT_CLEAR 0
 #define DETECTOR_MAX_NEW_INPUT_COUNT 10
-#define DETECTOR_HALF_MAX_NEW_INPUT_COUNT DETECTOR_MAX_NEW_INPUT_COUNT/2
-#define DETECTOR_FUDGE_FACTOR 2000
+#define DETECTOR_HALF_MAX_NEW_INPUT_COUNT ((DETECTOR_MAX_NEW_INPUT_COUNT/2) - 1)
+#define DETECTOR_FUDGE_FACTOR 5
 
-static volatile bool hit_detected;
-static volatile uint32_t adc_queue_elements_count;
-static volatile uint32_t original_filter_power_value[FILTER_NUMBER_OF_PLAYERS];
-static volatile detector_hitCount_t number_of_hits[FILTER_NUMBER_OF_PLAYERS];
+volatile static bool hit_detected;
+volatile static uint32_t adc_queue_elements_count;
+volatile static detector_hitCount_t number_of_hits[FILTER_NUMBER_OF_PLAYERS];
 
 double detector_scaled_adc_value(uint16_t value)
 {
@@ -28,22 +27,25 @@ double detector_scaled_adc_value(uint16_t value)
 
 void detector_hit_detection_algorithm()
 {
-    uint32_t filter_power_value[FILTER_NUMBER_OF_PLAYERS];
+    double filter_power_values[FILTER_NUMBER_OF_PLAYERS];
+    double original_filter_power_values[FILTER_NUMBER_OF_PLAYERS];
 
     for (uint16_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
     {
-        original_filter_power_value[i] = filter_getCurrentPowerValue(i);
-        filter_power_value[i] = original_filter_power_value[i];
+        filter_power_values[i] = filter_getCurrentPowerValue(i);
+        original_filter_power_values[i] = filter_power_values[i];
     }
 
-    quicksort(filter_power_value, FILTER_NUMBER_OF_PLAYERS);
+    quicksort(filter_power_values, FILTER_NUMBER_OF_PLAYERS);
 
-    for (uint16_t i = FILTER_NUMBER_OF_PLAYERS - 1; i >= 0; i--)
+    for (int8_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
     {
-        if (filter_power_value[i] >= filter_power_value[DETECTOR_HALF_MAX_NEW_INPUT_COUNT] * DETECTOR_FUDGE_FACTOR)
+        if (original_filter_power_values[i] > filter_power_values[DETECTOR_HALF_MAX_NEW_INPUT_COUNT] * DETECTOR_FUDGE_FACTOR)
         {
             hit_detected = true;
             number_of_hits[i]++;
+            lockoutTimer_start();
+            hitLedTimer_start();
 
             break;
         }
@@ -52,7 +54,7 @@ void detector_hit_detection_algorithm()
 
 void detector_init()
 {
-    //lockoutTimer_init();
+    lockoutTimer_init();
 
     for (uint8_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
     {
@@ -64,23 +66,26 @@ void detector(bool interruptsEnabled, bool ignoreSelf)
 {
     uint8_t add_new_input_count = DETECTOR_NEW_INPUT_COUNT_CLEAR;
     adc_queue_elements_count = isr_adcBufferElementCount();
+    uint16_t raw_value;
 
     for (uint32_t i = 0; i < adc_queue_elements_count; i++)
     {
         if (interruptsEnabled)
         {
             interrupts_disableArmInts();
-            isr_removeDataFromAdcBuffer();
+            raw_value = isr_removeDataFromAdcBuffer();
             interrupts_enableArmInts();
         }
 
         else
         {
-            isr_removeDataFromAdcBuffer();
+            raw_value = isr_removeDataFromAdcBuffer();
         }
 
-        filter_addNewInput(detector_scaled_adc_value(isr_removeDataFromAdcBuffer()));
+        filter_addNewInput(detector_scaled_adc_value(raw_value));
         add_new_input_count++;
+
+        printf("#\n\r");
 
         if (add_new_input_count >= DETECTOR_MAX_NEW_INPUT_COUNT)
         {
@@ -96,12 +101,6 @@ void detector(bool interruptsEnabled, bool ignoreSelf)
             if (!lockoutTimer_running())
             {
                 detector_hit_detection_algorithm();
-
-                if (hit_detected)
-                {
-                    lockoutTimer_start();
-                    hitLedTimer_start();
-                }
             }
         }
     }

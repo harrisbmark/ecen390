@@ -26,7 +26,7 @@ enum hitLedTimer_st_t
     hitLedTimer_led_on_st
 } hit_led_timer_current_state = hitLedTimer_idle_st;
 
-volatile static bool hit_led_timer_running;
+volatile static  bool hit_led_timer_running;
 volatile static bool hit_led_timer_hit_detected;
 volatile static uint32_t hit_led_timer_count;
 
@@ -63,6 +63,7 @@ void hitLedTimer_init()
     leds_init(true);
     mio_init(false);
     mio_setPinAsOutput(HIT_LED_JF_MIO_PIN);
+    hitLedTimer_turnLedOff();
 }
 
 // Calling this starts the timer.
@@ -89,6 +90,7 @@ void hitLedTimer_tick()
             if (hit_led_timer_hit_detected)
             {
                 hit_led_timer_hit_detected = false;
+                hit_led_timer_running = true;
                 hitLedTimer_turnLedOn();
                 hit_led_timer_current_state = hitLedTimer_led_on_st;
             }
@@ -104,6 +106,7 @@ void hitLedTimer_tick()
             if (hit_led_timer_count >= HIT_LED_TIMER_TIME_UP)
             {
                 hit_led_timer_count = HIT_LED_TIMER_CLEAR;
+                hit_led_timer_running = false;
                 hitLedTimer_turnLedOff();
                 hit_led_timer_current_state = hitLedTimer_idle_st;
             }
@@ -124,11 +127,9 @@ void hitLedTimer_tick()
     switch (hit_led_timer_current_state)
     {
         case hitLedTimer_idle_st:
-            hit_led_timer_running = false;
             break;
 
         case hitLedTimer_led_on_st:
-            hit_led_timer_running = true;
             hit_led_timer_count++;
             break;
     }
@@ -147,31 +148,6 @@ void hitLedTimer_turnLedOff()
     leds_write(HIT_LED_ZYBO_OFF);
     mio_writePin(HIT_LED_JF_MIO_PIN, HIT_LED_MIO_LOW);
 }
-
-/*void hitLedTimer_runTest()
-{
-    printf("Starting hitLedTimer run test...\n\r");
-
-    hitLedTimer_init();
-
-    for (uint8_t i = 0; i < HIT_LED_TEST_COUNT && !(buttons_read() & BUTTONS_BTN1_MASK); i++)
-    {
-        printf("Testing count %d out of %d\n\r", i + 1, HIT_LED_TEST_COUNT);
-
-        hitLedTimer_start();
-
-        while (hitLedTimer_running() && !(buttons_read() & BUTTONS_BTN1_MASK))
-        {
-            hitLedTimer_tick();
-        }
-
-        utils_msDelay(HIT_LED_TEST_MS_DELAY);
-    }
-
-    hitLedTimer_turnLedOff();
-
-    printf("Ended hitLedTimer run test.\n\r");
-}*/
 
 void hitLedTimer_runTest()
 {

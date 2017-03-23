@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-void quicksort(uint32_t*, uint32_t);
+void quicksort(double*, uint32_t);
 
 #endif
 

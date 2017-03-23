@@ -123,29 +123,6 @@ void lockoutTimer_tick()
     }
 }
 
-/*void lockoutTimer_runTest()
-{
-    printf("Started lockoutTimer run test...\n\r");
-
-    lockoutTimer_init();
-
-    for (uint8_t i = 0; i < LOCKOUT_TEST_COUNT && !(buttons_read() & BUTTONS_BTN1_MASK); i++)
-    {
-        printf("Test %d of %d\n\r", i + 1, LOCKOUT_TEST_COUNT);
-
-        lockoutTimer_start();
-
-        while (lockoutTimer_running() && !(buttons_read() & BUTTONS_BTN1_MASK))
-        {
-            lockoutTimer_tick();
-        }
-
-        utils_msDelay(LOCKOUT_TEST_MS_DELAY);
-    }
-
-    printf("Ended lockoutTimer run test.\n\r");
-}*/
-
 void lockoutTimer_runTest()
 {
     printf("Started lockoutTimer run test...\n\r");

@@ -12,12 +12,12 @@
 
 // Required defines for defining the fire time and debouncing the timers.
 #define FIRE_TIME_UP 50000
-#define PULL_TIME_UP 5000
-#define RELEASE_TIME_UP 5000
+#define PULL_TIME_UP 3000
+#define RELEASE_TIME_UP 3000
 
 // Required defines for initial value, MIO pin, and MIO pin output when the trigger is pressed.
 #define INITIAL 0
-#define TRIGGER_GUN_TRIGGER_MIO_PIN 13
+#define TRIGGER_GUN_TRIGGER_MIO_PIN 10
 #define GUN_TRIGGER_PRESSED 1
 
 // Required define used to debounce the buttons in testing.

@@ -127,6 +127,7 @@
       detector_init();
       filter_init();
       isr_init();
+      lockoutTimer_init();
       hitLedTimer_init();
       trigger_init();
     }

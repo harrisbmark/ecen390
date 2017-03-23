@@ -1,17 +1,17 @@
 #include "sort.h"
 
-void swap(uint32_t* data, uint32_t i, uint32_t j)
+void swap(double* data, uint32_t i, uint32_t j)
 {
-    uint32_t temp;
+    double temp;
 
     temp = data[i];
     data[i] = data[j];
     data[j] = temp;
 }
 
-uint32_t partition(uint32_t* data, uint32_t first, uint32_t last)
+uint32_t partition(double* data, uint32_t first, uint32_t last)
 {
-    uint32_t pivot = data[first];
+    double pivot = data[first];
     uint32_t i = first - 1;
     uint32_t j = last + 1;
 
@@ -30,7 +30,7 @@ uint32_t partition(uint32_t* data, uint32_t first, uint32_t last)
     }
 }
 
-void quicksort_algorithm(uint32_t* data, uint32_t first, uint32_t last)
+void quicksort_algorithm(double* data, uint32_t first, uint32_t last)
 {
     if (first < last)
     {
@@ -41,7 +41,7 @@ void quicksort_algorithm(uint32_t* data, uint32_t first, uint32_t last)
     }
 }
 
-void quicksort(uint32_t* data, uint32_t size)
+void quicksort(double* data, uint32_t size)
 {
     quicksort_algorithm(data, 0, size - 1);
 }

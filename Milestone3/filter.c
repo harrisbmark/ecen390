@@ -334,7 +334,10 @@ double filter_getCurrentPowerValue(uint16_t filterNumber){
 /*********************************************************************************************************/
 void filter_getCurrentPowerValues(double powerValues[]){
 	// Set the power values to the current power.
-    powerValues = current_power;
+    for (uint16_t i = 0; i < FILTER_NUMBER_OF_PLAYERS; i++)
+    {
+        powerValues[i] = current_power[i];
+    }
 }
 
 /*********************************************************************************************************/
