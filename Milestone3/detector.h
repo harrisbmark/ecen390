@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "../Milestone1/queue.h"
+#include "queue.h"
 
 
 typedef uint16_t detector_hitCount_t;
